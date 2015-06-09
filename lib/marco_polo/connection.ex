@@ -93,14 +93,13 @@ defmodule MarcoPolo.Connection do
   def handle_info({:tcp, socket, msg}, %{session_id: sid} = s) do
     # Reactivate the socket.
     :inet.setopts(s.socket, active: :once)
+
     {{:value, {from, op_name}}, new_queue} = :queue.out(s.queue)
     s = %{s | queue: new_queue}
 
     resp = case Protocol.parse_resp(op_name, msg, s.opts[:token?]) do
-      {:ok, ^sid, resp} ->
-        resp
-      {:ok, ^sid, token, resp} ->
-        resp
+      {:ok, ^sid, resp}         -> resp
+      {:ok, ^sid, _token, resp} -> resp
     end
 
     Connection.reply(from, resp)
@@ -108,6 +107,8 @@ defmodule MarcoPolo.Connection do
   end
 
   def handle_info({:tcp_closed, socket}, %{socket: socket} = s) do
+    Logger.error "TCP closed"
+    {:noreply, s}
   end
 
   def handle_info(msg, s) do

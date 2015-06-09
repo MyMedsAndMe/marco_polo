@@ -10,6 +10,9 @@ defmodule MarcoPolo.Protocol do
   @error <<1>>
   @null  <<-1 :: int>>
 
+  @doc """
+  """
+  @spec encode_op(op_name, [term]) :: iodata
   def encode_op(op_name, args \\ []) do
     [req_code(op_name), Enum.map(args, &serialize/1)]
   end
@@ -105,12 +108,36 @@ defmodule MarcoPolo.Protocol do
     {parsed, rest}
   end
 
+  def parse(data, :string) do
+    parse(data, :bytes)
+  end
+
+  defp parse_resp_contents(:db_create, <<>>) do
+    []
+  end
+
   defp parse_resp_contents(:db_exist, <<exists>>) do
     [exists == 1]
   end
 
+  defp parse_resp_contents(:db_drop, <<>>) do
+    []
+  end
+
   defp parse_resp_contents(:db_size, <<size :: long>>) do
     [size]
+  end
+
+  defp parse_resp_contents(:db_countrecords, <<count :: long>>) do
+    [count]
+  end
+
+  defp parse_resp_contents(:db_reload, <<num_of_clusters :: short, rest :: binary>>) do
+    Enum.map_reduce 1..num_of_clusters, rest, fn _, acc ->
+      {cluster_name, acc} = parse(acc, :string)
+      <<cluster_id :: short, acc :: binary>> = acc
+      {{cluster_name, cluster_id}, acc}
+    end
   end
 
   defp req_code(:shutdown),                        do: 1
