@@ -1,9 +1,12 @@
 defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
+  @version "0.0.1-dev"
+  @supported_protocol 28
+
   def project do
     [app: :marco_polo,
-     version: "0.0.1",
+     version: @version,
      elixir: "~> 1.0",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -18,11 +21,12 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger]]
+    [applications: [:logger],
+     env: [supported_protocol: @supported_protocol]]
   end
 
   defp deps do
-    []
+    [{:connection, github: "fishcakez/connection"}]
   end
 
   # This beauty is taken almost verbatim from the mix.exs file of the Ecto
