@@ -9,13 +9,7 @@ defmodule MarcoPolo.ConnectionTest do
     assert [true]  == C.operation(pid, :db_exist, ["GratefulDeadConcerts", "plocal"])
   end
 
-  test "successfully connecting to the server with a token" do
-    pid = connect(token?: true)
-    assert [false] == C.operation(pid, :db_exist, ["nonexistent", "plocal"])
-    assert [true]  == C.operation(pid, :db_exist, ["GratefulDeadConcerts", "plocal"])
-  end
-
-  test "successfully open a db" do
+  test "successfully opening a db" do
     pid = connect(connection: {:db, "GratefulDeadConcerts", "plocal"})
     assert [size] = C.operation(pid, :db_size, [])
     assert is_integer(size)
