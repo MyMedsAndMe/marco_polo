@@ -2,6 +2,7 @@ defmodule MarcoPolo.Protocol do
   require Integer
   import MarcoPolo.Protocol.BinaryHelpers
   alias MarcoPolo.Error
+  alias MarcoPolo.Protocol.RecordSerialization
 
   @type sid :: non_neg_integer
   @type op_code :: non_neg_integer
@@ -147,7 +148,8 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_load, <<1, type, version :: int, rest :: binary>>, acc) do
     {record_content, rest} = parse(rest, :bytes)
-    parse_resp_contents(:record_load, rest, [{type, version, record_content}|acc])
+    record = RecordSerialization.decode(record_content)
+    parse_resp_contents(:record_load, rest, [{type, version, record}|acc])
   end
 
   defp parse_resp_contents(:record_load, <<0>>, acc) do
