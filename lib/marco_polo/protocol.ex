@@ -1,4 +1,5 @@
 defmodule MarcoPolo.Protocol do
+  require Integer
   import MarcoPolo.Protocol.BinaryHelpers
   alias MarcoPolo.Error
 
@@ -138,6 +139,19 @@ defmodule MarcoPolo.Protocol do
       <<cluster_id :: short, acc :: binary>> = acc
       {{cluster_name, cluster_id}, acc}
     end
+  end
+
+  defp parse_resp_contents(:record_load, data) do
+    parse_resp_contents(:record_load, data, []) |> Enum.reverse
+  end
+
+  defp parse_resp_contents(:record_load, <<1, type, version :: int, rest :: binary>>, acc) do
+    {record_content, rest} = parse(rest, :bytes)
+    parse_resp_contents(:record_load, rest, [{type, version, record_content}|acc])
+  end
+
+  defp parse_resp_contents(:record_load, <<0>>, acc) do
+    acc
   end
 
   defp req_code(:shutdown),                        do: 1
