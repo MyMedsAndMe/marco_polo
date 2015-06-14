@@ -26,7 +26,8 @@ defmodule MarcoPolo.Mixfile do
   end
 
   defp deps do
-    [{:connection, github: "fishcakez/connection"}]
+    [{:connection, github: "fishcakez/connection"},
+     {:gpb, github: "tomas-abrahamsson/gpb", tag: "3.18.6"}]
   end
 
   # This beauty is taken almost verbatim from the mix.exs file of the Ecto
