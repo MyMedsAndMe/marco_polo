@@ -59,6 +59,9 @@ defmodule MarcoPolo.Connection do
     case :gen_tcp.connect(host, port, socket_opts) do
       {:ok, socket} ->
         s = %{s | socket: socket}
+        {:ok, [sndbuf: sndbuf, recbuf: recbuf]} = :inet.getopts(socket, [:sndbuf, :recbuf])
+        :ok = :inet.setopts(socket, [buffer: max(sndbuf, recbuf)])
+
         case do_connect(s) do
           {:ok, s} ->
             :inet.setopts(socket, active: :once)
