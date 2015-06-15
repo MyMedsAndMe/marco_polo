@@ -15,16 +15,76 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   """
   @spec decode(binary) :: {non_neg_integer, String.t, %{}}
   def decode(data) do
-    <<version, rest :: binary>> = data
-    {class_name, rest} = decode_string(rest)
-    fields = decode_header_fields(rest)
+    <<_version, rest :: binary>> = data
+    decode_document(rest)
+  end
 
-    fields = Enum.reduce fields, %{}, fn(field, acc) ->
-      value = decode_field(data, field)
-      Map.put(acc, field_name(field), value)
+  defp decode_document(data) do
+    {class_name, rest}    = decode_type(data, :string)
+    {header_fields, rest} = decode_header_fields(rest)
+    {fields, rest}        = decode_fields(rest, header_fields)
+
+    if class_name == "" do
+      class_name = nil
     end
 
-    {version, class_name, fields}
+    {{class_name, fields}, rest}
+  end
+
+  defp decode_header_fields(data, acc \\ []) do
+    {i, rest} = decode_zigzag_varint(data)
+
+    # If `i` is positive, that means the next field definition is a "named
+    # field" and `i` is the length of the field's name. If it's negative, it
+    # represents the property id of a property. If it's 0, it signals the end of
+    # the header segment.
+
+    cond do
+      i == 0 ->
+        # Remember to return `rest` and not `data` since we want to ditch the 0
+        # byte that signals the end of the header.
+        {Enum.reverse(acc), rest}
+      i < 0 ->
+        {data_ptr, rest} = decode_data_ptr(rest)
+        property = property(id: decode_property_id(i), data_ptr: data_ptr)
+        decode_header_fields(rest, [property|acc])
+      i > 0 ->
+        IO.puts "About to decode header field from: #{inspect data}"
+        {field_name, rest}            = decode_type(data, :string)
+        {data_ptr, rest}              = decode_data_ptr(rest)
+        <<data_type, rest :: binary>> = rest
+        field = named_field(name: field_name, data_type: int_to_type(data_type), data_ptr: data_ptr)
+
+        IO.puts "Decoded header field: #{inspect field}"
+
+        decode_header_fields(rest, [field|acc])
+    end
+  end
+
+  defp decode_fields(data, field_definitions) do
+    {fields_and_values, rest} = Enum.map_reduce field_definitions, data, fn
+      field, acc when is_record(field, :named_field) ->
+        named_field(data_type: type, data_ptr: ptr) = field
+
+        IO.puts "Decoding field: #{inspect field}..."
+
+        if ptr == 0 do
+          {{field, nil}, acc}
+        else
+          {value, rest} = decode_type(acc, type)
+          IO.puts "decoded field #{inspect field} with value #{inspect value}"
+          IO.puts "what comes next: #{inspect rest}"
+          {{field, value}, rest}
+        end
+    end
+
+    {fields_to_map(fields_and_values), rest}
+  end
+
+  defp fields_to_map(fields_and_values) do
+    for {field, value} <- fields_and_values, into: %{} do
+      {field_name(field), value}
+    end
   end
 
   # From Google's Protocol Buffer:
@@ -45,71 +105,73 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {decode_zigzag(i), rest}
   end
 
-  defp decode_string(data) do
-    {len, rest} = decode_zigzag_varint(data)
-    len = len * 8
-    <<string :: bits-size(len), rest :: binary>> = rest
-    {string, rest}
-  end
-
-  defp decode_header_fields(data, acc \\ []) do
-    {i, rest} = decode_zigzag_varint(data)
-
-    # If `i` is positive, that means the next field definition is a "named
-    # field" and `i` is the length of the field's name. If it's negative, it
-    # represents the (weirdly encoded) property id of a property. If it's 0, it
-    # signals the end of the header segment.
-
-    cond do
-      i == 0 ->
-        Enum.reverse(acc)
-      i < 0 ->
-        {data_ptr, rest} = decode_data_ptr(rest)
-        property = property(id: decode_property_id(i), data_ptr: data_ptr)
-        decode_header_fields(rest, [property|acc])
-      i > 0 ->
-        {field_name, rest}            = decode_string(data)
-        {data_ptr, rest}              = decode_data_ptr(rest)
-        <<data_type, rest :: binary>> = rest
-        field = named_field(name: field_name, data_type: int_to_type(data_type), data_ptr: data_ptr)
-        decode_header_fields(rest, [field|acc])
-    end
-  end
-
   # The pointer to the data is just a signed int32.
   defp decode_data_ptr(data) do
     <<data_ptr :: 32-signed, rest :: binary>> = data
     {data_ptr, rest}
   end
 
-  # Don't ask why.
   defp decode_property_id(i) do
     (i * -1) - 1
   end
 
-  # Decodes a field given the `field` definition and the whole `data`. Returns
-  # just the value (not the usual `{value, rest}` tuple) as `field` contains a
-  # pointer to its data in `data`.
-  defp decode_field(data, field) when is_record(field, :named_field) do
-    named_field(data_ptr: ptr, data_type: type) = field
-    {_, field_start} = :erlang.split_binary(data, ptr)
-    decode_type(field_start, type)
-  end
+  # Decodes an instance of `type` from `data`.
+  defp decode_type(data, type)
 
-  defp decode_type(<<0>> <> _, :boolean), do: false
-  defp decode_type(<<1>> <> _, :boolean), do: false
+  defp decode_type(<<0>> <> rest, :boolean), do: {false, rest}
+  defp decode_type(<<1>> <> rest, :boolean), do: {true, rest}
 
   defp decode_type(data, type) when type in [:sint16, :sint32, :sint64] do
-    decode_zigzag_varint(data) |> elem(1)
+    decode_zigzag_varint(data)
   end
 
-  defp decode_type(data, :string) do
-    decode_string(data) |> elem(1)
+  defp decode_type(data, :float) do
+    <<float_bytes :: 32-bits, rest :: binary>> = data
+    {float_bytes, rest}
   end
 
-  defp field_name(field) when is_record(field, :named_field) do
-    named_field(field, :name)
+  defp decode_type(data, type) when type in [:string, :bytes] do
+    {len, rest} = decode_zigzag_varint(data)
+    len = len * 8
+    <<string :: bits-size(len), rest :: binary>> = rest
+    {string, rest}
   end
+
+  defp decode_type(data, :embedded) do
+    decode_document(data)
+  end
+
+  defp decode_type(data, :embedded_list) do
+    {nitems, rest} = decode_zigzag_varint(data)
+    <<type, rest :: binary>> = rest
+
+    # Only ANY is supported by OrientDB at the moment.
+    :any = int_to_type(type)
+
+    # OPTIMIZE: I have to find a better (clean) way to `map_reduce` n times
+    # instead of mapreducing over a list of n times the number 0, which is
+    # uselessly expensive to build and plain useless. A range doesn't work
+    # because `Enum.to_list(1..0)` is `[1, 0]` which makes sense, but my
+    # 1..nitems has to translate to `[]` so that the mapreducing doesn't
+    # actually happen.
+    Enum.map_reduce List.duplicate(0, nitems), rest, fn(_, acc) ->
+      <<type, acc :: binary>> = acc
+      decode_type(acc, int_to_type(type))
+    end
+  end
+
+  defp decode_type(data, :embedded_set) do
+    decode_type(data, :embedded_list)
+  end
+
+  # I've been bitten a few times with FunctionClauseErrors because I still haven't
+  # defined how to decode all types, so let's leave this here until we know how
+  # to decode them all. Makes it easier to debug :).
+  defp decode_type(data, type) do
+    raise "don't know how to decode #{inspect type} from data: #{inspect data}"
+  end
+
+  defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
 
   # http://orientdb.com/docs/last/Types.html
   defp int_to_type(0),  do: :boolean
