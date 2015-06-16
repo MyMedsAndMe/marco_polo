@@ -1,1 +1,1 @@
-%{"connection": {:git, "git://github.com/fishcakez/connection.git", "d226e3d0767a6c293207faaa9056ed17b00cb5c0", []}}
+%{"connection": {:git, "git://github.com/fishcakez/connection.git", "7d0612e4baa24a015cc70d8bdcee90b417316a3a", []}}
