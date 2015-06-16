@@ -90,9 +90,9 @@ defmodule MarcoPolo.Connection do
   @doc false
   def handle_info(msg, state)
 
-  def handle_info({:tcp, socket, msg}, %{session_id: sid} = s) do
+  def handle_info({:tcp, socket, msg}, %{session_id: sid, socket: socket} = s) do
     # Reactivate the socket.
-    :inet.setopts(s.socket, active: :once)
+    :inet.setopts(socket, active: :once)
 
     {{:value, {from, op_name}}, new_queue} = :queue.out(s.queue)
     s = %{s | queue: new_queue}
