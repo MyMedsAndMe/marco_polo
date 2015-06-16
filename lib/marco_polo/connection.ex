@@ -37,11 +37,11 @@ defmodule MarcoPolo.Connection do
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
     opts = Keyword.merge(@default_opts, opts)
-    Connection.start_link(__MODULE__, opts, name: __MODULE__)
+    Connection.start_link(__MODULE__, opts)
   end
 
   def operation(pid, op_name, args) do
-    Connection.call(__MODULE__, {:operation, op_name, args})
+    Connection.call(pid, {:operation, op_name, args})
   end
 
   ## Callbacks.
