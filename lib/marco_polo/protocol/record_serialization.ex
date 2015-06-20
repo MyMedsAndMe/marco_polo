@@ -10,6 +10,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defrecordp :property, [:id, :data_ptr]
   defrecordp :named_field, [:name, :data_type, :data_ptr]
 
+  defrecordp :map_key, [:key, :data_type, :data_ptr]
+
   @doc """
   Parses a binary-serialized record.
   """
@@ -149,6 +151,30 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp decode_type(data, :embedded_set) do
     decode_type(data, :embedded_list)
+  end
+
+  defp decode_type(data, :embedded_map) do
+    {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
+
+    {keys, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<type, acc :: binary>>) ->
+      {key, acc} = decode_type(acc, int_to_type(type))
+      {data_ptr, acc} = decode_data_ptr(acc)
+      <<data_type, acc :: binary>> = acc
+      {map_key(key: key, data_type: int_to_type(data_type), data_ptr: data_ptr), acc}
+    end
+
+    {keys_and_values, rest} = Enum.map_reduce keys, rest, fn(key, acc) ->
+      map_key(key: key_name, data_type: type, data_ptr: ptr) = key
+
+      if ptr == 0 do
+        {{key_name, nil}, acc}
+      else
+        {value, acc} = decode_type(acc, type)
+        {{key_name, value}, acc}
+      end
+    end
+
+    {Enum.into(keys_and_values, %{}), rest}
   end
 
   # I've been bitten a few times with FunctionClauseErrors because I still haven't
