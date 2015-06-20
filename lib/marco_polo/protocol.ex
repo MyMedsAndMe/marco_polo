@@ -54,6 +54,11 @@ defmodule MarcoPolo.Protocol do
   def serialize({:int, i}),   do: <<i :: int>>
   def serialize({:long, i}),  do: <<i :: long>>
 
+  # Modes (sync, async, no_response).
+  def serialize({:mode, :sync}),        do: 0
+  def serialize({:mode, :async}),       do: 1
+  def serialize({:mode, :no_response}), do: 1
+
   @doc """
   """
   @spec parse_connection_header(binary) :: {:ok, sid, binary} | Error.t
@@ -155,6 +160,9 @@ defmodule MarcoPolo.Protocol do
   defp parse_resp_contents(:record_load, <<0>>, acc) do
     acc
   end
+
+  defp parse_resp_contents(:record_delete, <<1>>), do: true
+  defp parse_resp_contents(:record_delete, <<0>>), do: false
 
   defp req_code(:shutdown),                        do: 1
   defp req_code(:connect),                         do: 2
