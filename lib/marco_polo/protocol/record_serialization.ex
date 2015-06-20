@@ -115,8 +115,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_type(data, :float) do
-    <<float_bytes :: 32-bits, rest :: binary>> = data
-    {float_bytes, rest}
+    <<float :: 32-float, rest :: binary>> = data
+    {float, rest}
+  end
+
+  defp decode_type(data, :double) do
+    <<double :: 64-float, rest :: binary>> = data
+    {double, rest}
   end
 
   defp decode_type(data, type) when type in [:string, :bytes] do
