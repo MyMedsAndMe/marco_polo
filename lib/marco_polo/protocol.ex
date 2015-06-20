@@ -54,6 +54,12 @@ defmodule MarcoPolo.Protocol do
   def serialize({:int, i}),   do: <<i :: int>>
   def serialize({:long, i}),  do: <<i :: long>>
 
+  # A list is assumed to be iodata and is converted to binary before being serialized.
+  def serialize(data) when is_list(data), do: data |> IO.iodata_to_binary |> serialize
+
+  # Raw bytes (that have no leading length, just the bytes).
+  def serialize({:raw, bytes}), do: bytes
+
   # Modes (sync, async, no_response).
   def serialize({:mode, :sync}),        do: 0
   def serialize({:mode, :async}),       do: 1
