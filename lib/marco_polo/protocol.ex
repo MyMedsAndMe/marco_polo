@@ -171,12 +171,16 @@ defmodule MarcoPolo.Protocol do
     acc
   end
 
-  defp parse_resp_contents(:record_delete, <<1>>), do: true
-  defp parse_resp_contents(:record_delete, <<0>>), do: false
-
   defp parse_resp_contents(:record_create, <<cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>>) do
     {"##{cluster_id}:#{cluster_position}", record_version, rest}
   end
+
+  defp parse_resp_contents(:record_update, <<record_version :: int, rest :: binary>>) do
+    {record_version, rest}
+  end
+
+  defp parse_resp_contents(:record_delete, <<1>>), do: true
+  defp parse_resp_contents(:record_delete, <<0>>), do: false
 
   defp record_type(?d), do: :document
 
