@@ -14,9 +14,8 @@ defmodule MarcoPolo.Protocol do
 
   @doc """
   """
-  @spec encode_op(op_name, [term]) :: iodata
-  def encode_op(op_name, args \\ []) do
-    [req_code(op_name), Enum.map(args, &serialize/1)]
+  def encode_op(op_name, args) do
+    [req_code(op_name)|Enum.map(args, &serialize/1)]
   end
 
   @doc """
@@ -54,10 +53,20 @@ defmodule MarcoPolo.Protocol do
   def serialize({:int, i}),   do: <<i :: int>>
   def serialize({:long, i}),  do: <<i :: long>>
 
+  # A list is assumed to be iodata and is converted to binary before being serialized.
+  def serialize(data) when is_list(data), do: data |> IO.iodata_to_binary |> serialize
+
+  # Raw bytes (that have no leading length, just the bytes).
+  def serialize({:raw, bytes}) when is_binary(bytes), do: bytes
+  def serialize({:raw, bytes}),                       do: [bytes]
+
+  # An entire record.
+  def serialize({:record, record}), do: serialize(RecordSerialization.encode(record))
+
   # Modes (sync, async, no_response).
-  def serialize({:mode, :sync}),        do: 0
-  def serialize({:mode, :async}),       do: 1
-  def serialize({:mode, :no_response}), do: 1
+  def serialize({:mode, :sync}),        do: <<0>>
+  def serialize({:mode, :async}),       do: <<0>>
+  def serialize({:mode, :no_response}), do: <<2>>
 
   @doc """
   """
@@ -153,8 +162,9 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_load, <<1, type, version :: int, rest :: binary>>, acc) do
     {record_content, rest} = parse(rest, :bytes)
-    record = RecordSerialization.decode(record_content)
-    parse_resp_contents(:record_load, rest, [{type, version, record}|acc])
+    {class_name, fields} = RecordSerialization.decode(record_content)
+    record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
+    parse_resp_contents(:record_load, rest, [{record_type(type), record}|acc])
   end
 
   defp parse_resp_contents(:record_load, <<0>>, acc) do
@@ -163,6 +173,12 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_delete, <<1>>), do: true
   defp parse_resp_contents(:record_delete, <<0>>), do: false
+
+  defp parse_resp_contents(:record_create, <<cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>>) do
+    {"##{cluster_id}:#{cluster_position}", record_version, rest}
+  end
+
+  defp record_type(?d), do: :document
 
   defp req_code(:shutdown),                        do: 1
   defp req_code(:connect),                         do: 2
