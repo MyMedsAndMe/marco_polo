@@ -156,6 +156,9 @@ defmodule MarcoPolo.Protocol do
     acc
   end
 
+  defp parse_resp_contents(:record_delete, <<1>>), do: true
+  defp parse_resp_contents(:record_delete, <<0>>), do: false
+
   defp req_code(:shutdown),                        do: 1
   defp req_code(:connect),                         do: 2
   defp req_code(:db_open),                         do: 3
