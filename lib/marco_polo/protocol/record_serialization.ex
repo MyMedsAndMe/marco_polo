@@ -20,6 +20,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     record
   end
 
+  @doc """
+  Serializes a record using the binary serialization protocol.
+  """
+  def encode({class_name, fields}) do
+    version_and_class = [0, encode_type(class_name || "", :string)]
+    offset            = IO.iodata_length(version_and_class)
+    encoded_fields    = encode_fields(fields, offset)
+
+    [version_and_class, encoded_fields]
+  end
+
   defp decode_document(data) do
     {class_name, rest}    = decode_type(data, :string)
     {header_fields, rest} = decode_header_fields(rest)
@@ -165,6 +176,54 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     raise "don't know how to decode #{inspect type} from data: #{inspect data}"
   end
 
+  defp encode_fields(fields, offset) do
+    fields =
+      for {name, value} <- fields do
+        field = named_field(name: name, data_type: :string)
+        value = encode_type(value, :string)
+        {field, value}
+      end
+
+    fields_offset = Enum.map(fields, fn({field, _}) ->
+      encode_header_field(field) |> IO.iodata_length
+    end) |> Enum.sum
+
+    # The last +1 is for the `0` that signals the end of the header.
+    offset = offset + fields_offset + 1
+
+    {fields, values, _} = Enum.reduce fields, {[], [], 0}, fn({field, value}, {fs, vs, index}) ->
+      ptr = offset + index
+      encoded_field = named_field(field, data_ptr: ptr) |> encode_header_field
+
+      index = index + IO.iodata_length(value)
+
+      {[encoded_field|fs], [value|vs], index}
+    end
+
+    fields = Enum.reverse(fields)
+    values = Enum.reverse(values)
+
+    [fields, 0, values]
+  end
+
+  defp encode_header_field(field) when is_record(field, :named_field) do
+    named_field(name: name, data_ptr: ptr, data_type: type) = field
+
+    if is_nil(ptr) do
+      ptr = 0
+    end
+
+    # TODO: the '7' here is the hardcoded code for the 'string' type.
+    [encode_type(name, :string), <<ptr :: 32-signed>>, 7]
+  end
+
+  # Encodes an instance of `type`. Returns an iodata instead of a binary.
+  defp encode_type(data, type)
+
+  defp encode_type(str, :string) do
+    [encode_zigzag_varint(byte_size(str)), str]
+  end
+
   # Symmetric implementation of `decode_zigzag/2`.
   defp encode_zigzag(i) when i >= 0, do: 2 * i
   defp encode_zigzag(i) when i < 0,  do: (-2 * i) - 1
@@ -173,6 +232,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_zigzag_varint(i) do
     i |> encode_zigzag |> :gpb.encode_varint
   end
+
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
 
   # http://orientdb.com/docs/last/Types.html
