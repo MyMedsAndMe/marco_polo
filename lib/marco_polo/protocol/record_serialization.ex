@@ -165,6 +165,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     raise "don't know how to decode #{inspect type} from data: #{inspect data}"
   end
 
+  # Symmetric implementation of `decode_zigzag/2`.
+  defp encode_zigzag(i) when i >= 0, do: 2 * i
+  defp encode_zigzag(i) when i < 0,  do: (-2 * i) - 1
+
+  # Symmetric implementation of `decode_zigzag_varint/1`.
+  defp encode_zigzag_varint(i) do
+    i |> encode_zigzag |> :gpb.encode_varint
+  end
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
 
   # http://orientdb.com/docs/last/Types.html
