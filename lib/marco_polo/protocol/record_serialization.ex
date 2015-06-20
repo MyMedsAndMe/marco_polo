@@ -16,7 +16,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   @spec decode(binary) :: {non_neg_integer, String.t, %{}}
   def decode(data) do
     <<_version, rest :: binary>> = data
-    decode_document(rest)
+    {record, <<>>} = decode_document(rest)
+    record
   end
 
   defp decode_document(data) do
@@ -49,13 +50,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
         property = property(id: decode_property_id(i), data_ptr: data_ptr)
         decode_header_fields(rest, [property|acc])
       i > 0 ->
-        IO.puts "About to decode header field from: #{inspect data}"
         {field_name, rest}            = decode_type(data, :string)
         {data_ptr, rest}              = decode_data_ptr(rest)
         <<data_type, rest :: binary>> = rest
         field = named_field(name: field_name, data_type: int_to_type(data_type), data_ptr: data_ptr)
-
-        IO.puts "Decoded header field: #{inspect field}"
 
         decode_header_fields(rest, [field|acc])
     end
@@ -66,14 +64,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       field, acc when is_record(field, :named_field) ->
         named_field(data_type: type, data_ptr: ptr) = field
 
-        IO.puts "Decoding field: #{inspect field}..."
-
         if ptr == 0 do
           {{field, nil}, acc}
         else
           {value, rest} = decode_type(acc, type)
-          IO.puts "decoded field #{inspect field} with value #{inspect value}"
-          IO.puts "what comes next: #{inspect rest}"
           {{field, value}, rest}
         end
     end
