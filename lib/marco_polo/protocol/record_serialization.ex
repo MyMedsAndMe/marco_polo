@@ -44,7 +44,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_header_fields(data, acc \\ []) do
-    {i, rest} = decode_zigzag_varint(data)
+    {i, rest} = :small_ints.decode_zigzag_varint(data)
 
     # If `i` is positive, that means the next field definition is a "named
     # field" and `i` is the length of the field's name. If it's negative, it
@@ -92,24 +92,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  # From Google's Protocol Buffer:
-  #
-  #   ZigZag encoding maps signed integers to unsigned integers so that numbers
-  #   with a small absolute value (for instance, -1) have a small varint encoded
-  #   value too. It does this in a way that "zig-zags" back and forth through the
-  #   positive and negative integers, so that -1 is encoded as 1, 1 is encoded as
-  #   2, -2 is encoded as 3, and so on [...].
-  #
-  defp decode_zigzag(i) when rem(i, 2) == 0, do: div(i, 2)
-  defp decode_zigzag(i) when rem(i, 2) == 1, do: - (div(i, 2) + 1)
-
-  # varints are decoded using the `:gpb` Erlang library (which is a dependency
-  # of this project).
-  defp decode_zigzag_varint(data) when is_binary(data) do
-    {i, rest} = :gpb.decode_varint(data)
-    {decode_zigzag(i), rest}
-  end
-
   # The pointer to the data is just a signed int32.
   defp decode_data_ptr(data) do
     <<data_ptr :: 32-signed, rest :: binary>> = data
@@ -127,7 +109,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp decode_type(<<1>> <> rest, :boolean), do: {true, rest}
 
   defp decode_type(data, type) when type in [:sint16, :sint32, :sint64] do
-    decode_zigzag_varint(data)
+    :small_ints.decode_zigzag_varint(data)
   end
 
   defp decode_type(data, :float) do
@@ -136,7 +118,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_type(data, type) when type in [:string, :bytes] do
-    {len, rest} = decode_zigzag_varint(data)
+    {len, rest} = :small_ints.decode_zigzag_varint(data)
     len = len * 8
     <<string :: bits-size(len), rest :: binary>> = rest
     {string, rest}
@@ -147,7 +129,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_type(data, :embedded_list) do
-    {nitems, rest} = decode_zigzag_varint(data)
+    {nitems, rest} = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
     # Only ANY is supported by OrientDB at the moment.
@@ -221,16 +203,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_type(data, type)
 
   defp encode_type(str, :string) do
-    [encode_zigzag_varint(byte_size(str)), str]
-  end
-
-  # Symmetric implementation of `decode_zigzag/2`.
-  defp encode_zigzag(i) when i >= 0, do: 2 * i
-  defp encode_zigzag(i) when i < 0,  do: (-2 * i) - 1
-
-  # Symmetric implementation of `decode_zigzag_varint/1`.
-  defp encode_zigzag_varint(i) do
-    i |> encode_zigzag |> :gpb.encode_varint
+    [:small_ints.encode_zigzag_varint(byte_size(str)), str]
   end
 
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
