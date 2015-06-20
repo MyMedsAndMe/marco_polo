@@ -1,2 +1,2 @@
-%{"connection": {:git, "git://github.com/fishcakez/connection.git", "d226e3d0767a6c293207faaa9056ed17b00cb5c0", []},
+%{"connection": {:git, "git://github.com/fishcakez/connection.git", "0673602e65532f9e11e95cd9dd80968731183dd6", []},
   "gpb": {:git, "git://github.com/tomas-abrahamsson/gpb.git", "17b8343093f22153c4473fad4df3e0934ef6d431", [tag: "3.18.6"]}}
