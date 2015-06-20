@@ -40,6 +40,11 @@ defmodule MarcoPolo.Connection do
     Connection.start_link(__MODULE__, opts)
   end
 
+  def operation(pid, op_name, mode, args)
+      when op_name in ~w(record_create record_update record_delete command)a do
+    Connection.call(pid, {:operation, op_name, mode, args})
+  end
+
   def operation(pid, op_name, args) do
     Connection.call(pid, {:operation, op_name, args})
   end
@@ -81,13 +86,26 @@ defmodule MarcoPolo.Connection do
   def handle_call(call, from, s)
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
-    args = if token = s.token, do: [sid, token|args], else: [sid|args]
-    req  = Protocol.encode_op(op_name, args)
+    req = Protocol.encode_op(op_name, [sid|args])
 
     s = update_in(s.queue, &:queue.in({from, op_name}, &1))
 
     :gen_tcp.send(s.socket, req)
     {:noreply, s}
+  end
+
+  def handle_call({:operation, op_name, mode, args} = msg, from, s)
+      when mode in [:sync, :async] do
+    handle_call({:operation, op_name, args}, from, s)
+  end
+
+  def handle_call({:operation, op_name, :no_response, args}, from, %{session_id: sid} = s) do
+    req = Protocol.encode_op(op_name, [sid|args])
+
+    s = update_in(s.queue, &:queue.in({from, op_name, :no_response}, &1))
+
+    :gen_tcp.send(s.socket, req)
+    {:reply, :ok, s}
   end
 
   @doc false
@@ -97,7 +115,14 @@ defmodule MarcoPolo.Connection do
     # Reactivate the socket.
     :inet.setopts(socket, active: :once)
 
-    {{:value, {from, op_name}}, new_queue} = :queue.out(s.queue)
+    {{:value, queued}, new_queue} = :queue.out(s.queue)
+
+    {from, op_name, no_response?} =
+      case queued do
+        {from, op_name}               -> {from, op_name, false}
+        {from, op_name, :no_response} -> {from, op_name, true}
+      end
+
     s = %{s | queue: new_queue}
 
     resp = case Protocol.parse_resp(op_name, msg, s.opts[:token?]) do
@@ -105,7 +130,10 @@ defmodule MarcoPolo.Connection do
       {:ok, ^sid, _token, resp} -> resp
     end
 
-    Connection.reply(from, resp)
+    unless no_response? do
+      Connection.reply(from, resp)
+    end
+
     {:noreply, s}
   end
 
