@@ -4,6 +4,17 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.Error
   alias MarcoPolo.Protocol.RecordSerialization
 
+  @type encodable_term ::
+    boolean
+    | nil
+    | binary
+    | integer
+    | iolist
+    | {:short, integer}
+    | {:int, integer}
+    | {:long, integer}
+    | {:raw, binary}
+
   @type sid :: non_neg_integer
   @type op_code :: non_neg_integer
   @type op_name :: atom
@@ -15,7 +26,7 @@ defmodule MarcoPolo.Protocol do
   @doc """
   """
   def encode_op(op_name, args) do
-    [req_code(op_name)|Enum.map(args, &serialize/1)]
+    [req_code(op_name)|Enum.map(args, &encode_term/1)]
   end
 
   @doc """
@@ -30,43 +41,44 @@ defmodule MarcoPolo.Protocol do
     * integers (by default encoded as "int", but the size of the integer can be
       specified by "tagging" the integer, e.g., `{:short, 28}` or
       `{:long, 1000}`).
+    * lists (assumed to be iolists)
+    * raw bytes (with `{:raw, bytes}`)
 
   """
-  @spec serialize(term) :: iodata
-  def serialize(term)
+  @spec encode_term(encodable_term) :: iodata
+  def encode_term(term)
 
   # Booleans.
-  def serialize(true),  do: <<1>>
-  def serialize(false), do: <<0>>
+  def encode_term(true),  do: <<1>>
+  def encode_term(false), do: <<0>>
 
   # nil.
-  def serialize(nil), do: serialize({:int, -1})
+  def encode_term(nil), do: encode_term({:int, -1})
 
   # Strings and bytes.
-  def serialize(str) when is_binary(str), do: serialize({:int, byte_size(str)}) <> str
+  def encode_term(str) when is_binary(str), do: encode_term({:int, byte_size(str)}) <> str
 
   # Encoding an Elixir integer defaults to encoding an OrientDB int (4 bytes).
-  def serialize(i) when is_integer(i), do: serialize({:int, i})
+  def encode_term(i) when is_integer(i), do: encode_term({:int, i})
 
   # Typed integers (short, int and long) have to be tagged.
-  def serialize({:short, i}), do: <<i :: short>>
-  def serialize({:int, i}),   do: <<i :: int>>
-  def serialize({:long, i}),  do: <<i :: long>>
+  def encode_term({:short, i}), do: <<i :: short>>
+  def encode_term({:int, i}),   do: <<i :: int>>
+  def encode_term({:long, i}),  do: <<i :: long>>
 
   # A list is assumed to be iodata and is converted to binary before being serialized.
-  def serialize(data) when is_list(data), do: data |> IO.iodata_to_binary |> serialize
+  def encode_term(data) when is_list(data), do: [encode_term(IO.iodata_length(data)), data]
 
   # Raw bytes (that have no leading length, just the bytes).
-  def serialize({:raw, bytes}) when is_binary(bytes), do: bytes
-  def serialize({:raw, bytes}),                       do: [bytes]
+  def encode_term({:raw, bytes}) when is_binary(bytes), do: bytes
 
   # An entire record.
-  def serialize({:record, record}), do: serialize(RecordSerialization.encode(record))
+  def encode_term({:record, record}), do: encode_term(RecordSerialization.encode(record))
 
   # Modes (sync, async, no_response).
-  def serialize({:mode, :sync}),        do: <<0>>
-  def serialize({:mode, :async}),       do: <<0>>
-  def serialize({:mode, :no_response}), do: <<2>>
+  def encode_term({:mode, :sync}),        do: <<0>>
+  def encode_term({:mode, :async}),       do: <<0>>
+  def encode_term({:mode, :no_response}), do: <<2>>
 
   @doc """
   """
@@ -118,14 +130,10 @@ defmodule MarcoPolo.Protocol do
   @doc """
   """
   @spec parse(binary, atom) :: {binary, binary}
-  def parse(<<length :: int, data :: binary>>, :bytes) do
+  def parse(<<length :: int, data :: binary>>, type) when type in [:string, :bytes] do
     length = bytes(length)
     <<parsed :: bits-size(length), rest :: binary>> = data
     {parsed, rest}
-  end
-
-  def parse(data, :string) do
-    parse(data, :bytes)
   end
 
   defp parse_resp_contents(:db_create, <<>>) do
