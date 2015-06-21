@@ -90,41 +90,28 @@ defmodule MarcoPolo.Protocol do
 
   @doc """
   """
-  @spec parse_header(binary, boolean) ::
-    {:ok, sid, binary, binary}
-    | {:ok, sid, binary}
-    | Error.t
-  def parse_header(data, token?)
-
-  def parse_header(@ok <> <<sid :: int, rest :: binary>>, true = _token?) do
-    {token, rest} = parse(rest, :bytes)
-    {:ok, sid, token, rest}
-  end
-
-  def parse_header(@ok <> <<sid :: int, rest :: binary>>, false = _token?) do
-    {:ok, sid, rest}
-  end
-
-  def parse_header(@error <> <<_sid :: int, rest :: binary>>, token?) do
-    if token? do
-      {_token, rest} = parse(rest, :bytes)
+  @spec parse_resp(op_name, binary) :: {:ok, sid, binary, binary} | Error.t
+  def parse_resp(op_name, data) do
+    case parse_header(data) do
+      {:ok, sid, rest} ->
+        {:ok, sid, parse_resp_contents(op_name, rest)}
+      {:server_error, rest} ->
+        {errors, rest} = parse_errors(rest)
+        {:error, Error.from_errors(errors)}
     end
-
-    %Error{message: "error (binary dump: #{inspect rest})"}
   end
 
   @doc """
   """
-  @spec parse_resp(op_name, binary, boolean) ::
-    {:ok, sid, binary, binary}
-    | {:ok, sid, binary}
-    | Error.t
-  def parse_resp(op_name, data, token?) do
-    case parse_header(data, token?) do
-      {:ok, sid, rest}        -> {:ok, sid, parse_resp_contents(op_name, rest)}
-      {:ok, sid, token, rest} -> {:ok, sid, token, parse_resp_contents(op_name, rest)}
-      %Error{} = error        -> error
-    end
+  @spec parse_header(binary) :: {:ok, sid, binary} | Error.t
+  def parse_header(data)
+
+  def parse_header(@ok <> <<sid :: int, rest :: binary>>) do
+    {:ok, sid, rest}
+  end
+
+  def parse_header(@error <> <<_sid :: int, rest :: binary>>) do
+    {:server_error, rest}
   end
 
   @doc """
@@ -134,6 +121,20 @@ defmodule MarcoPolo.Protocol do
     length = bytes(length)
     <<parsed :: bits-size(length), rest :: binary>> = data
     {parsed, rest}
+  end
+
+  defp parse_errors(data, acc \\ [])
+
+  defp parse_errors(<<1, rest :: binary>>, acc) do
+    {class, rest}   = parse(rest, :string)
+    {message, rest} = parse(rest, :string)
+    parse_errors(rest, [{class, message}|acc])
+  end
+
+  defp parse_errors(<<0, rest :: binary>>, acc) do
+    # What am I supposed to do with a Java binary dump of the exception?! :(
+    {_dump, rest} = parse(rest, :bytes)
+    {Enum.reverse(acc), rest}
   end
 
   defp parse_resp_contents(:db_create, <<>>) do
