@@ -12,21 +12,31 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defrecordp :map_key, [:key, :data_type, :data_ptr]
 
+  defmodule Field do
+    @type t :: %__MODULE__{
+      name: binary,
+      type: atom,
+      pointer_to_data: non_neg_integer,
+      encoded_value: iodata,
+    }
+
+    defstruct ~w(name type pointer_to_data value encoded_value)a
+  end
+
   @doc """
   Parses a binary-serialized record.
   """
   @spec decode(binary) :: {non_neg_integer, String.t, %{}}
   def decode(data) do
     <<_version, rest :: binary>> = data
-    {record, <<>>} = decode_document(rest)
-    record
+    rest |> decode_document |> elem(0)
   end
 
   @doc """
   Serializes a record using the binary serialization protocol.
 
   `class_name` is a string containing the class name of the record being
-  encoded. `fields` is a list of fields.
+  encoded. `fields` is a list of `Field` structs.
   """
   def encode({class_name, fields}) do
     version_and_class = [0, encode_type(class_name || "", :string)]
@@ -36,10 +46,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [version_and_class, encoded_fields]
   end
 
+  # Decodes a document (ODocument). This ODocument can be a "top-level" document
+  # or an "embedded" type, since the leading serialization version byte is not
+  # decoded here (but in `decode/1`).
   defp decode_document(data) do
-    {class_name, rest}    = decode_type(data, :string)
-    {header_fields, rest} = decode_header_fields(rest)
-    {fields, rest}        = decode_fields(rest, header_fields)
+    {class_name, rest}        = decode_type(data, :string)
+    {field_definitions, rest} = decode_header(rest)
+    {fields, rest}            = decode_fields(rest, field_definitions)
 
     if class_name == "" do
       class_name = nil
@@ -48,52 +61,51 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {{class_name, fields}, rest}
   end
 
-  defp decode_header_fields(data, acc \\ []) do
+  # Decodes an header returning a list of field definitions (which is a list of
+  # `%Field{}` structs).
+  defp decode_header(data, acc \\ []) do
     {i, rest} = :small_ints.decode_zigzag_varint(data)
 
     # If `i` is positive, that means the next field definition is a "named
     # field" and `i` is the length of the field's name. If it's negative, it
     # represents the property id of a property. If it's 0, it signals the end of
     # the header segment.
-
     cond do
       i == 0 ->
-        # Remember to return `rest` and not `data` since we want to ditch the 0
-        # byte that signals the end of the header.
+        # Remember to return `rest` and not `data` since `rest` doesn't contain
+        # the 0 byte that signals the end of the header, while `data` does; we
+        # want to ditch that byte.
         {Enum.reverse(acc), rest}
       i < 0 ->
-        {data_ptr, rest} = decode_data_ptr(rest)
-        property = property(id: decode_property_id(i), data_ptr: data_ptr)
-        decode_header_fields(rest, [property|acc])
+         raise "properties aren't supported yet, only fields with a name and an explicit type"
       i > 0 ->
-        {field_name, rest}            = decode_type(data, :string)
-        {data_ptr, rest}              = decode_data_ptr(rest)
-        <<data_type, rest :: binary>> = rest
-        field = named_field(name: field_name, data_type: int_to_type(data_type), data_ptr: data_ptr)
-
-        decode_header_fields(rest, [field|acc])
+        {field, rest} = decode_field_definition(:named_field, data)
+        decode_header(rest, [field|acc])
     end
   end
 
+  # Decodes the definition of a named field in the header (`data`). Returns a
+  # `%Field{}` struct with an empty value.
+  defp decode_field_definition(:named_field, data) do
+    {field_name, rest}            = decode_type(data, :string)
+    {data_ptr, rest}              = decode_data_ptr(rest)
+    <<data_type, rest :: binary>> = rest
+
+    field = %Field{name: field_name, type: int_to_type(data_type), pointer_to_data: data_ptr}
+    {field, rest}
+  end
+
+  # Decodes fields from the body of a serialized document (`data`) and a list of
+  # `%Field{}` structs (with no `:value` field, they're definitions). Returns a
+  # list of `%Field{}`s and the rest of the given data.
   defp decode_fields(data, field_definitions) do
-    {fields_and_values, rest} = Enum.map_reduce field_definitions, data, fn
-      field, acc when is_record(field, :named_field) ->
-        named_field(data_type: type, data_ptr: ptr) = field
-
-        if ptr == 0 do
-          {{field, nil}, acc}
-        else
-          {value, rest} = decode_type(acc, type)
-          {{field, value}, rest}
-        end
-    end
-
-    {build_fields(fields_and_values), rest}
-  end
-
-  defp build_fields(fields_and_values) do
-    for {field, value} <- fields_and_values, into: %{} do
-      {named_field(field, :name), value}
+    {fields, rest} = Enum.map_reduce field_definitions, data, fn(%Field{} = field, acc) ->
+      if field.pointer_to_data == 0 do
+        {%{field | value: nil}, acc}
+      else
+        {value, rest} = decode_type(acc, field.type)
+        {%{field | value: value}, rest}
+      end
     end
   end
 
@@ -101,10 +113,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp decode_data_ptr(data) do
     <<data_ptr :: 32-signed, rest :: binary>> = data
     {data_ptr, rest}
-  end
-
-  defp decode_property_id(i) do
-    (i * -1) - 1
   end
 
   # Decodes an instance of `type` from `data`.
@@ -193,44 +201,43 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp encode_fields(fields, offset) do
-    fields =
-      for {name, value} <- fields do
-        type  = infer_type_from_term(value)
-        field = named_field(name: name, data_type: type)
-        value = encode_type(value, type)
-        {field, value}
-      end
+    fields = Enum.map(fields, &encode_field_value/1)
+    offset = offset + header_offset(fields)
 
-    fields_offset = Enum.map(fields, fn({field, _}) ->
-      encode_header_field(field) |> IO.iodata_length
-    end) |> Enum.sum
+    {fields, values, _} = Enum.reduce fields, {[], [], offset}, fn(%Field{} = field, {fs, vs, index}) ->
+      encoded_field = %{field | pointer_to_data: index} |> encode_field_for_header
+      index         = index + IO.iodata_length(field.encoded_value)
 
-    # The last +1 is for the `0` that signals the end of the header.
-    offset = offset + fields_offset + 1
-
-    {fields, values, _} = Enum.reduce fields, {[], [], 0}, fn({field, value}, {fs, vs, index}) ->
-      ptr = offset + index
-      encoded_field = named_field(field, data_ptr: ptr) |> encode_header_field
-
-      index = index + IO.iodata_length(value)
-
-      {[encoded_field|fs], [value|vs], index}
+      {[encoded_field|fs], [field.encoded_value|vs], index}
     end
 
-    fields = Enum.reverse(fields)
-    values = Enum.reverse(values)
-
-    [fields, 0, values]
+    [Enum.reverse(fields), 0, Enum.reverse(values)]
   end
 
-  defp encode_header_field(field) when is_record(field, :named_field) do
-    named_field(name: name, data_ptr: ptr, data_type: type) = field
+  # Returns the length of the header based on the list of fields.
+  defp header_offset(fields) do
+    # The last +1 is for the `0` that signals the end of the header.
+    fields
+    |> Enum.map(&(&1 |> encode_field_for_header |> IO.iodata_length))
+    |> Enum.sum
+    |> +(1)
+  end
 
+  # Returns the given `%Field{}` with the `:encoded_value` field set to the
+  # result of encoding the `:value` field.
+  defp encode_field_value(%Field{type: type, value: value} = field) do
+    %{field | encoded_value: encode_type(value, type)}
+  end
+
+  # Encodes the given `%Field{}` for the header, i.e., just the field
+  # representation and not the value (name, pointer to data, type). Returns
+  # iodata.
+  defp encode_field_for_header(%Field{pointer_to_data: ptr, type: type, name: name} = field) do
     if is_nil(ptr) do
       ptr = 0
     end
 
-    [encode_type(name, type), <<ptr :: 32-signed>>, type_to_int(type)]
+    [encode_type(name, :string), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
   # Encodes an instance of `type`. Returns an iodata instead of a binary.
@@ -247,13 +254,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
-
-  defp infer_type_from_term(term) when is_binary(term),  do: :string
-  defp infer_type_from_term(term) when is_integer(term), do: :sint32
-  defp infer_type_from_term(term) when is_float(term),   do: :double
-  defp infer_type_from_term(term) when is_boolean(term), do: :boolean
-  defp infer_type_from_term(term) when is_list(term),    do: :embedded_list
-  defp infer_type_from_term(term) when is_map(term),     do: :embedded_map
 
   # http://orientdb.com/docs/last/Types.html
   @types [
