@@ -85,12 +85,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
         end
     end
 
-    {fields_to_map(fields_and_values), rest}
+    {build_fields(fields_and_values), rest}
   end
 
-  defp fields_to_map(fields_and_values) do
+  defp build_fields(fields_and_values) do
     for {field, value} <- fields_and_values, into: %{} do
-      {field_name(field), value}
+      {named_field(field, :name), value}
     end
   end
 
@@ -192,8 +192,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_fields(fields, offset) do
     fields =
       for {name, value} <- fields do
-        field = named_field(name: name, data_type: :string)
-        value = encode_type(value, :string)
+        type = infer_type_from_term(value)
+        field = named_field(name: name, data_type: type)
+        value = encode_type(value, type)
         {field, value}
       end
 
@@ -227,7 +228,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
 
     # TODO: the '7' here is the hardcoded code for the 'string' type.
-    [encode_type(name, :string), <<ptr :: 32-signed>>, 7]
+    [encode_type(name, type), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
   # Encodes an instance of `type`. Returns an iodata instead of a binary.
@@ -239,29 +240,43 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
 
+  defp infer_type_from_term(term) when is_binary(term),  do: :string
+  defp infer_type_from_term(term) when is_integer(term), do: :sint32
+  defp infer_type_from_term(term) when is_float(term),   do: :double
+  defp infer_type_from_term(term) when is_boolean(term), do: :boolean
+  defp infer_type_from_term(term) when is_list(term),    do: :embedded_list
+  defp infer_type_from_term(term) when is_map(term),     do: :embedded_map
+
   # http://orientdb.com/docs/last/Types.html
-  defp int_to_type(0),  do: :boolean
-  defp int_to_type(1),  do: :sint32
-  defp int_to_type(2),  do: :sint16
-  defp int_to_type(3),  do: :sint64
-  defp int_to_type(4),  do: :float
-  defp int_to_type(5),  do: :double
-  defp int_to_type(6),  do: :datetime
-  defp int_to_type(7),  do: :string
-  defp int_to_type(8),  do: :binary
-  defp int_to_type(9),  do: :embedded
-  defp int_to_type(10), do: :embedded_list
-  defp int_to_type(11), do: :embedded_set
-  defp int_to_type(12), do: :embedded_map
-  defp int_to_type(13), do: :link
-  defp int_to_type(14), do: :link_list
-  defp int_to_type(15), do: :link_set
-  defp int_to_type(16), do: :link_map
-  defp int_to_type(17), do: :embedded_list
-  defp int_to_type(18), do: :byte
-  defp int_to_type(19), do: :transient
-  defp int_to_type(20), do: :custom
-  defp int_to_type(21), do: :decimal
-  defp int_to_type(22), do: :link_bag
-  defp int_to_type(23), do: :any
+  @types [
+    boolean: 0,
+    sint32: 1,
+    sint16: 2,
+    sint64: 3,
+    float: 4,
+    double: 5,
+    datetime: 6,
+    string: 7,
+    binary: 8,
+    embedded: 9,
+    embedded_list: 10,
+    embedded_set: 11,
+    embedded_map: 12,
+    link: 13,
+    link_list: 14,
+    link_set: 15,
+    link_map: 16,
+    byte: 17,
+    transient: 18,
+    date: 19,
+    custom: 20,
+    decimal: 21,
+    link_bag: 22,
+    any: 23,
+  ]
+
+  for {type_name, type_id} <- @types do
+    defp int_to_type(unquote(type_id)), do: unquote(type_name)
+    defp type_to_int(unquote(type_name)), do: unquote(type_id)
+  end
 end
