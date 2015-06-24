@@ -24,6 +24,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   @doc """
   Serializes a record using the binary serialization protocol.
+
+  `class_name` is a string containing the class name of the record being
+  encoded. `fields` is a list of fields.
   """
   def encode({class_name, fields}) do
     version_and_class = [0, encode_type(class_name || "", :string)]
@@ -192,7 +195,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_fields(fields, offset) do
     fields =
       for {name, value} <- fields do
-        type = infer_type_from_term(value)
+        type  = infer_type_from_term(value)
         field = named_field(name: name, data_type: type)
         value = encode_type(value, type)
         {field, value}
@@ -227,15 +230,20 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       ptr = 0
     end
 
-    # TODO: the '7' here is the hardcoded code for the 'string' type.
     [encode_type(name, type), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
   # Encodes an instance of `type`. Returns an iodata instead of a binary.
-  defp encode_type(data, type)
+  # Made public for testing.
+  @doc false
+  def encode_type(data, type)
 
-  defp encode_type(str, :string) do
+  def encode_type(str, :string) do
     [:small_ints.encode_zigzag_varint(byte_size(str)), str]
+  end
+
+  def encode_type(i, type) when type in [:sint16, :sint32, :sint64] do
+    :small_ints.encode_zigzag_varint(i)
   end
 
   defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
