@@ -1,17 +1,7 @@
 defmodule MarcoPolo.Protocol.RecordSerialization do
   require Record
 
-  # We're creating records instead of structs to avoid creating lots of
-  # modules. `:property` identifies a field that is in the schema's metadata
-  # (`:id` is the property id) while `:named_field` identifies a "dynamic"
-  # field, with a `:name` and a type (`:data_type`). Both records contain a
-  # `:data_ptr` field that contains the index of the data structure for that
-  # field in the serialized record.
-  Record.defrecordp :property, [:id, :data_ptr]
-  Record.defrecordp :named_field, [:name, :data_type, :data_ptr]
-
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
-
   Record.defrecordp :typed_field, [:value, :type]
 
   defmodule Field do
