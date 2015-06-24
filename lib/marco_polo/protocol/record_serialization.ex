@@ -1,5 +1,5 @@
 defmodule MarcoPolo.Protocol.RecordSerialization do
-  import Record
+  require Record
 
   # We're creating records instead of structs to avoid creating lots of
   # modules. `:property` identifies a field that is in the schema's metadata
@@ -7,16 +7,19 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # field, with a `:name` and a type (`:data_type`). Both records contain a
   # `:data_ptr` field that contains the index of the data structure for that
   # field in the serialized record.
-  defrecordp :property, [:id, :data_ptr]
-  defrecordp :named_field, [:name, :data_type, :data_ptr]
+  Record.defrecordp :property, [:id, :data_ptr]
+  Record.defrecordp :named_field, [:name, :data_type, :data_ptr]
 
-  defrecordp :map_key, [:key, :data_type, :data_ptr]
+  Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
+
+  Record.defrecordp :typed_field, [:value, :type]
 
   defmodule Field do
     @type t :: %__MODULE__{
       name: binary,
       type: atom,
       pointer_to_data: non_neg_integer,
+      value: term,
       encoded_value: iodata,
     }
 
@@ -146,7 +149,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     decode_document(data)
   end
 
-  defp decode_type(data, :embedded_list) do
+  defp decode_type(data, type) when type in [:embedded_list, :embedded_set] do
     {nitems, rest} = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
@@ -165,23 +168,31 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp decode_type(data, :embedded_set) do
-    decode_type(data, :embedded_list)
+  defp decode_type(data, :embedded_map) do
+    {keys, rest}   = decode_map_header(data)
+    {keys_and_values, rest} = decode_map_values(rest, keys)
+
+    {Enum.into(keys_and_values, %{}), rest}
   end
 
-  defp decode_type(data, :embedded_map) do
+  defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
 
-    {keys, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<type, acc :: binary>>) ->
-      {key, acc} = decode_type(acc, int_to_type(type))
-      {data_ptr, acc} = decode_data_ptr(acc)
-      <<data_type, acc :: binary>> = acc
-      {map_key(key: key, data_type: int_to_type(data_type), data_ptr: data_ptr), acc}
+    {keys, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
+      # For now, OrientDB only supports STRING keys.
+      :string = int_to_type(string_type)
+
+      {key, acc} = decode_type(acc, :string)
+      {ptr, acc} = decode_data_ptr(acc)
+      IO.inspect ptr
+      <<type, acc :: binary>> = acc
+
+      {map_key(key: key, data_type: int_to_type(type), data_ptr: ptr), acc}
     end
+  end
 
-    {keys_and_values, rest} = Enum.map_reduce keys, rest, fn(key, acc) ->
-      map_key(key: key_name, data_type: type, data_ptr: ptr) = key
-
+  defp decode_map_values(data, keys) do
+    Enum.map_reduce keys, data, fn(map_key(key: key_name, data_type: type, data_ptr: ptr), acc) ->
       if ptr == 0 do
         {{key_name, nil}, acc}
       else
@@ -189,26 +200,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
         {{key_name, value}, acc}
       end
     end
-
-    {Enum.into(keys_and_values, %{}), rest}
-  end
-
-  # I've been bitten a few times with FunctionClauseErrors because I still haven't
-  # defined how to decode all types, so let's leave this here until we know how
-  # to decode them all. Makes it easier to debug :).
-  defp decode_type(data, type) do
-    raise "don't know how to decode #{inspect type} from data: #{inspect data}"
   end
 
   defp encode_fields(fields, offset) do
-    fields = Enum.map(fields, &encode_field_value/1)
     offset = offset + header_offset(fields)
 
     {fields, values, _} = Enum.reduce fields, {[], [], offset}, fn(%Field{} = field, {fs, vs, index}) ->
+      encoded_value = encode_field_value(field, index).encoded_value
       encoded_field = %{field | pointer_to_data: index} |> encode_field_for_header
-      index         = index + IO.iodata_length(field.encoded_value)
+      index         = index + IO.iodata_length(encoded_value)
 
-      {[encoded_field|fs], [field.encoded_value|vs], index}
+      {[encoded_field|fs], [encoded_value|vs], index}
     end
 
     [Enum.reverse(fields), 0, Enum.reverse(values)]
@@ -218,6 +220,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp header_offset(fields) do
     # The last +1 is for the `0` that signals the end of the header.
     fields
+    |> Enum.map(&encode_field_value(&1, 0))
     |> Enum.map(&(&1 |> encode_field_for_header |> IO.iodata_length))
     |> Enum.sum
     |> +(1)
@@ -225,8 +228,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   # Returns the given `%Field{}` with the `:encoded_value` field set to the
   # result of encoding the `:value` field.
-  defp encode_field_value(%Field{type: type, value: value} = field) do
-    %{field | encoded_value: encode_type(value, type)}
+  defp encode_field_value(%Field{type: type, value: value} = field, offset) do
+    %{field | encoded_value: encode_type(value, type, offset)}
   end
 
   # Encodes the given `%Field{}` for the header, i.e., just the field
@@ -243,17 +246,42 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Encodes an instance of `type`. Returns an iodata instead of a binary.
   # Made public for testing.
   @doc false
-  def encode_type(data, type)
+  def encode_type(data, type, offset \\ nil)
 
-  def encode_type(str, :string) do
+  def encode_type(str, :string, _) when is_binary(str) do
     [:small_ints.encode_zigzag_varint(byte_size(str)), str]
   end
 
-  def encode_type(i, type) when type in [:sint16, :sint32, :sint64] do
+  def encode_type(i, type, _) when type in [:sint16, :sint32, :sint64] and is_integer(i) do
     :small_ints.encode_zigzag_varint(i)
   end
 
-  defp field_name(field) when is_record(field, :named_field), do: named_field(field, :name)
+  def encode_type(map, :embedded_map, offset) when is_map(map) do
+    offset = offset + map_header_offset(map)
+
+    {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
+      typed_field(value: value, type: type) = value
+      encoded_value = encode_type(value, type)
+      key = [type_to_int(:string), encode_type(key, :string), <<index :: 32-signed>>, type_to_int(type)]
+      index = index + IO.iodata_length(encoded_value)
+      {[key|ks], [encoded_value|vs], index}
+    end
+
+    nkeys = map |> Map.keys |> Enum.count |> :small_ints.encode_zigzag_varint
+
+    [nkeys, keys, values]
+  end
+
+  defp map_header_offset(map) do
+    keys = Map.keys(map)
+
+    # `6` means 4 bytes for the pointer to the data, 1 byte for the data type,
+    # and 1 byte for the key type.
+    nkeys       = :small_ints.encode_zigzag_varint(Enum.count(keys))
+    key_lengths = Enum.map(keys, &(IO.iodata_length(encode_type(&1, :string)) + 6))
+
+    byte_size(nkeys) + Enum.sum(key_lengths)
+  end
 
   # http://orientdb.com/docs/last/Types.html
   @types [
