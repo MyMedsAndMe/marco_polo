@@ -1,3 +1,2 @@
-%{"connection": {:git, "git://github.com/fishcakez/connection.git", "0673602e65532f9e11e95cd9dd80968731183dd6", []},
-  "gpb": {:git, "git://github.com/tomas-abrahamsson/gpb.git", "17b8343093f22153c4473fad4df3e0934ef6d431", [tag: "3.18.6"]},
-  "small_ints": {:git, "git://github.com/whatyouhide/small_ints.git", "9c1174face8d1de579d65f543102d230b04c4d86", []}}
+%{"connection": {:git, "git://github.com/fishcakez/connection.git", "581729581289de1ba7d9220aa7feacaf7ccef764", []},
+  "small_ints": {:git, "git://github.com/whatyouhide/small_ints.git", "6e6c60a86d11fa176dfc857a8268af57bf409444", []}}
