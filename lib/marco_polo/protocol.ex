@@ -70,7 +70,7 @@ defmodule MarcoPolo.Protocol do
   def encode_term(data) when is_list(data), do: [encode_term(IO.iodata_length(data)), data]
 
   # Raw bytes (that have no leading length, just the bytes).
-  def encode_term({:raw, bytes}) when is_binary(bytes), do: bytes
+  def encode_term({:raw, bytes}) when is_binary(bytes) or is_list(bytes), do: bytes
 
   # An entire record.
   def encode_term({:record, record}), do: encode_term(RecordSerialization.encode(record))
@@ -190,6 +190,30 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_delete, <<1>>), do: true
   defp parse_resp_contents(:record_delete, <<0>>), do: false
+
+  @list ?l
+  @set  ?s
+
+  defp parse_resp_contents(:command, <<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
+    # Records are encoded like this here:
+    # (record-kind?:short)(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)
+    # because why not? I have no idea what record-kind is, this link:
+    # https://groups.google.com/forum/#!searchin/orient-database/idempotent/orient-database/i3IXXVLCyNo/GJGPkGXtHF0J
+    # is the closest I got to finding out more.
+    {records, rest} = Enum.map_reduce List.duplicate(0, nrecords), rest, fn(_, acc) ->
+      <<_unknown :: short, record_type, cluster_id :: short, cluster_position :: long, record_version :: int, acc :: binary>> = acc
+      {record_content, acc} = parse(acc, :bytes)
+      {class_name, fields} = RecordSerialization.decode(record_content)
+      record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
+      {{record_type(record_type), record}, acc}
+    end
+
+    # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
+    # mentioned in the docs :(
+    <<0>> = rest
+
+    records
+  end
 
   defp record_type(?d), do: :document
 
