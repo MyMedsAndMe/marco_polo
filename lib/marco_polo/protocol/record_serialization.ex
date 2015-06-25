@@ -1,4 +1,6 @@
 defmodule MarcoPolo.Protocol.RecordSerialization do
+  @moduledoc false
+
   require Record
 
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]

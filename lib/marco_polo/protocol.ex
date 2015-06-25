@@ -1,4 +1,6 @@
 defmodule MarcoPolo.Protocol do
+  @moduledoc false
+
   require Integer
   import MarcoPolo.Protocol.BinaryHelpers
   alias MarcoPolo.Error

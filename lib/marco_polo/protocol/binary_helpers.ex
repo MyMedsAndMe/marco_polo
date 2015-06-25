@@ -1,5 +1,5 @@
 defmodule MarcoPolo.Protocol.BinaryHelpers do
-  @doc false
+  @moduledoc false
 
   # This module provides some helpers to be used when pattern matching with the
   # binary syntax. For example, the `bytes(n)` helper can be used to specify a
