@@ -191,10 +191,17 @@ defmodule MarcoPolo.Protocol do
   defp parse_resp_contents(:record_delete, <<1>>), do: true
   defp parse_resp_contents(:record_delete, <<0>>), do: false
 
-  @list ?l
-  @set  ?s
+  @null_result       ?n
+  @list              ?l
+  @set               ?s
+  @single_record     ?r
+  @serialized_result ?a
 
-  defp parse_resp_contents(:command, <<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
+  defp parse_resp_contents(:command, data) do
+    parse_resp_to_command(data)
+  end
+
+  defp parse_resp_to_command(<<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
     # Records are encoded like this here:
     # (record-kind?:short)(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)
     # because why not? I have no idea what record-kind is, this link:
@@ -213,6 +220,19 @@ defmodule MarcoPolo.Protocol do
     <<0>> = rest
 
     records
+  end
+
+  defp parse_resp_to_command(<<@single_record, rest :: binary>>) do
+    <<_unknown :: short, record_type, cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>> = rest
+    {record_content, rest} = parse(rest, :bytes)
+    {class_name, fields} = RecordSerialization.decode(record_content)
+    record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
+
+    # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
+    # mentioned in the docs :(
+    <<0>> = rest
+
+    {record_type(record_type), record}
   end
 
   defp record_type(?d), do: :document
