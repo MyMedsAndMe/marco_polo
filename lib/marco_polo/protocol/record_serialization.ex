@@ -236,7 +236,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Encodes an instance of `type`. Returns an iodata instead of a binary.
   # Made public for testing.
   @doc false
-  def encode_type(data, type, offset \\ nil)
+  def encode_type(data, type, offset \\ 0)
 
   def encode_type(str, :string, _) when is_binary(str) do
     [:small_ints.encode_zigzag_varint(byte_size(str)), str]
