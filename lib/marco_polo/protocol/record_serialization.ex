@@ -94,7 +94,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # `%Field{}` structs (with no `:value` field, they're definitions). Returns a
   # list of `%Field{}`s and the rest of the given data.
   defp decode_fields(data, field_definitions) do
-    {fields, rest} = Enum.map_reduce field_definitions, data, fn(%Field{} = field, acc) ->
+    Enum.map_reduce field_definitions, data, fn(%Field{} = field, acc) ->
       if field.pointer_to_data == 0 do
         {%{field | value: nil}, acc}
       else
@@ -170,7 +170,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
 
-    {keys, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
+    Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
       # For now, OrientDB only supports STRING keys.
       :string = int_to_type(string_type)
 
@@ -227,7 +227,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Encodes the given `%Field{}` for the header, i.e., just the field
   # representation and not the value (name, pointer to data, type). Returns
   # iodata.
-  defp encode_field_for_header(%Field{pointer_to_data: ptr, type: type, name: name} = field) do
+  defp encode_field_for_header(%Field{pointer_to_data: ptr, type: type, name: name}) do
     if is_nil(ptr) do
       ptr = 0
     end
