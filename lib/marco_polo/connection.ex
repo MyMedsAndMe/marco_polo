@@ -32,8 +32,6 @@ defmodule MarcoPolo.Connection do
 
   ## Client code.
 
-  @doc """
-  """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
     opts = Keyword.merge(@default_opts, opts)
@@ -79,6 +77,12 @@ defmodule MarcoPolo.Connection do
 
   @doc false
   def handle_call(call, from, s)
+
+  # No socket means there's no TCP connection, we can return an error to the
+  # client.
+  def handle_call(_call, _from, %{socket: nil} = s) do
+    {:reply, {:error, :closed}, s}
+  end
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
     req = Protocol.encode_op(op_name, [sid|args])
