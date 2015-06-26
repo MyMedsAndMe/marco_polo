@@ -19,24 +19,12 @@ defmodule MarcoPolo.Connection do
 
   @socket_opts [:binary, active: false, packet: :raw]
 
-  @default_opts [
-    host: "localhost",
-    port: 2424,
-    token?: false,
-  ]
-
   @initial_state %{socket: nil,
                    session_id: nil,
                    token: nil,
                    queue: :queue.new}
 
   ## Client code.
-
-  @spec start_link(Keyword.t) :: GenServer.on_start
-  def start_link(opts \\ []) do
-    opts = Keyword.merge(@default_opts, opts)
-    Connection.start_link(__MODULE__, opts)
-  end
 
   def operation(pid, op_name, args) do
     Connection.call(pid, {:operation, op_name, args})
