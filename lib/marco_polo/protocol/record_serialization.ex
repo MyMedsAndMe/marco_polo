@@ -130,7 +130,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {double, rest}
   end
 
-  defp decode_type(data, type) when type in [:string, :bytes] do
+  defp decode_type(data, type) when type in [:string, :binary] do
     {len, rest} = :small_ints.decode_zigzag_varint(data)
     len = len * 8
     <<string :: bits-size(len), rest :: binary>> = rest
@@ -240,7 +240,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   @doc false
   def encode_type(data, type, offset \\ 0)
 
-  def encode_type(str, :string, _) when is_binary(str) do
+  def encode_type(str, type, _) when type in [:string, :binary] and is_binary(str) do
     [:small_ints.encode_zigzag_varint(byte_size(str)), str]
   end
 
