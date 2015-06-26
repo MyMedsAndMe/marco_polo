@@ -98,7 +98,7 @@ defmodule MarcoPolo.Protocol do
       {:ok, sid, rest} ->
         {:ok, sid, parse_resp_contents(op_name, rest)}
       {:server_error, rest} ->
-        {errors, rest} = parse_errors(rest)
+        {errors, _rest} = parse_errors(rest)
         {:error, Error.from_errors(errors)}
     end
   end
@@ -171,7 +171,6 @@ defmodule MarcoPolo.Protocol do
     data |> parse_resp_to_record_load([]) |> Enum.reverse
   end
 
-
   defp parse_resp_contents(:record_create, <<cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>>) do
     {"##{cluster_id}:#{cluster_position}", record_version, rest}
   end
@@ -232,7 +231,7 @@ defmodule MarcoPolo.Protocol do
   # -3 - RID only (cluster_id as a short, cluster_position as a long)
 
   defp parse_record_with_rid(<<0 :: short, rest :: binary>>) do
-    <<record_type, cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>> = rest
+    <<record_type, _cluster_id :: short, _cluster_position :: long, record_version :: int, rest :: binary>> = rest
     {record_content, rest} = parse(rest, :bytes)
     {class_name, fields} = RecordSerialization.decode(record_content)
     record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
@@ -240,7 +239,7 @@ defmodule MarcoPolo.Protocol do
     {{record_type(record_type), record}, rest}
   end
 
-  defp parse_record_with_rid(<<-2 :: short, rest :: binary>>) do
+  defp parse_record_with_rid(<<-2 :: short, _rest :: binary>>) do
     nil
   end
 
