@@ -120,8 +120,7 @@ defmodule MarcoPolo.Protocol do
   """
   @spec parse(binary, atom) :: {binary, binary}
   def parse(<<length :: int, data :: binary>>, type) when type in [:string, :bytes] do
-    length = bytes(length)
-    <<parsed :: bits-size(length), rest :: binary>> = data
+    <<parsed :: bytes-size(length), rest :: binary>> = data
     {parsed, rest}
   end
 

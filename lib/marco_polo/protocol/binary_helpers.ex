@@ -2,28 +2,24 @@ defmodule MarcoPolo.Protocol.BinaryHelpers do
   @moduledoc false
 
   # This module provides some helpers to be used when pattern matching with the
-  # binary syntax. For example, the `bytes(n)` helper can be used to specify a
-  # number of bytes instead of using bits:
+  # binary syntax. For example:
   #
-  #     <<value :: bytes(4)>> = data
+  #     <<record_version :: int, ...>> = data
   #
   # These helpers are tied to OrientDB's binary protocol.
 
-  defmacro bytes(n) do
-    quote do
-      unquote(n) * 8
-    end
-  end
-
+  # 2 bytes
   defmacro short do
-    quote do: unquote(bytes(2))-signed
+    quote do: 16-signed
   end
 
+  # 4 bytes
   defmacro int do
-    quote do: unquote(bytes(4))-signed
+    quote do: 32-signed
   end
 
+  # 8 bytes
   defmacro long do
-    quote do: unquote(bytes(8))-signed
+    quote do: 64-signed
   end
 end
