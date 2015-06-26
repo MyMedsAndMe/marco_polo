@@ -168,19 +168,9 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:record_load, data) do
-    parse_resp_contents(:record_load, data, []) |> Enum.reverse
+    data |> parse_resp_to_record_load([]) |> Enum.reverse
   end
 
-  defp parse_resp_contents(:record_load, <<1, type, version :: int, rest :: binary>>, acc) do
-    {record_content, rest} = parse(rest, :bytes)
-    {class_name, fields} = RecordSerialization.decode(record_content)
-    record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
-    parse_resp_contents(:record_load, rest, [{record_type(type), record}|acc])
-  end
-
-  defp parse_resp_contents(:record_load, <<0>>, acc) do
-    acc
-  end
 
   defp parse_resp_contents(:record_create, <<cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>>) do
     {"##{cluster_id}:#{cluster_position}", record_version, rest}
@@ -201,6 +191,17 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:command, data) do
     parse_resp_to_command(data)
+  end
+
+  defp parse_resp_to_record_load(<<1, type, version :: int, rest :: binary>>, acc) do
+    {record_content, rest} = parse(rest, :bytes)
+    {class_name, fields} = RecordSerialization.decode(record_content)
+    record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
+    parse_resp_to_record_load(rest, [{record_type(type), record}|acc])
+  end
+
+  defp parse_resp_to_record_load(<<0>>, acc) do
+    acc
   end
 
   defp parse_resp_to_command(<<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
