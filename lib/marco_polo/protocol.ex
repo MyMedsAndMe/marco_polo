@@ -204,17 +204,8 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_command(<<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
-    # Records are encoded like this here:
-    # (record-kind?:short)(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)
-    # because why not? I have no idea what record-kind is, this link:
-    # https://groups.google.com/forum/#!searchin/orient-database/idempotent/orient-database/i3IXXVLCyNo/GJGPkGXtHF0J
-    # is the closest I got to finding out more.
     {records, rest} = Enum.map_reduce List.duplicate(0, nrecords), rest, fn(_, acc) ->
-      <<_unknown :: short, record_type, cluster_id :: short, cluster_position :: long, record_version :: int, acc :: binary>> = acc
-      {record_content, acc} = parse(acc, :bytes)
-      {class_name, fields} = RecordSerialization.decode(record_content)
-      record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
-      {{record_type(record_type), record}, acc}
+      parse_record_with_rid(acc)
     end
 
     # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
@@ -225,16 +216,36 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_command(<<@single_record, rest :: binary>>) do
-    <<_unknown :: short, record_type, cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>> = rest
-    {record_content, rest} = parse(rest, :bytes)
-    {class_name, fields} = RecordSerialization.decode(record_content)
-    record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
+    {record, rest} = parse_record_with_rid(rest)
 
     # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
     # mentioned in the docs :(
     <<0>> = rest
 
-    {record_type(record_type), record}
+    record
+  end
+
+  # Meaning of the first two bytes in a record definition:
+  # 0  - full-fledged record
+  # -2 - null record
+  # -3 - RID only (cluster_id as a short, cluster_position as a long)
+
+  defp parse_record_with_rid(<<0 :: short, rest :: binary>>) do
+    <<record_type, cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>> = rest
+    {record_content, rest} = parse(rest, :bytes)
+    {class_name, fields} = RecordSerialization.decode(record_content)
+    record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
+
+    {{record_type(record_type), record}, rest}
+  end
+
+  defp parse_record_with_rid(<<-2 :: short, rest :: binary>>) do
+    nil
+  end
+
+  defp parse_record_with_rid(<<-3 :: short, rest :: binary>>) do
+    <<cluster_id :: short, cluster_position :: long>> = rest
+    {cluster_id, cluster_position}
   end
 
   defp record_type(?d), do: :document
