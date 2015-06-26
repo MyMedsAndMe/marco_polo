@@ -21,7 +21,6 @@ defmodule MarcoPolo.Connection do
 
   @initial_state %{socket: nil,
                    session_id: nil,
-                   token: nil,
                    queue: :queue.new}
 
   ## Client code.
@@ -128,7 +127,7 @@ defmodule MarcoPolo.Connection do
   defp authenticate(%{opts: opts, socket: socket} = s) do
     user     = Keyword.fetch!(opts, :user)
     password = Keyword.fetch!(opts, :password)
-    token?   = Keyword.fetch!(opts, :token?)
+    token?   = false
 
     req = case Keyword.fetch!(opts, :connection) do
       :server ->
