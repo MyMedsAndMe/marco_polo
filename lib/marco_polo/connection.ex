@@ -163,11 +163,9 @@ defmodule MarcoPolo.Connection do
   defp parse_connection_response(data, s) do
     case Protocol.parse_connection_header(data) do
       {:ok, sid, rest} ->
-        {token, _rest} = Protocol.parse(rest, :bytes)
+        {_token, _rest} = Protocol.parse(rest, :bytes)
 
-        s = %{s | session_id: sid}
-        s = %{s | token: nullify_empty(token)}
-        {:ok, s}
+        {:ok, %{s | session_id: sid}}
       %Error{} = error ->
         error
     end
@@ -189,7 +187,4 @@ defmodule MarcoPolo.Connection do
       %Error{message: "unsupported protocol version, the supported version is >= #{protocol_number}"}
     end
   end
-
-  defp nullify_empty(""),   do: nil
-  defp nullify_empty(term), do: term
 end
