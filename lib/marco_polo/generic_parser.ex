@@ -57,6 +57,11 @@ defmodule MarcoPolo.GenericParser do
   end
 
   @doc """
+  Returns a parser that parses arrays.
+
+  The returned parser will first parse the number of elements in the array from
+  the given binary using the `nelems_fn` parser; then, it will parse elements
+  using the `elem_parsers` parsers that number of times.
   """
   @spec array_parser(parser, [parser]) :: parser
   def array_parser(nelems_fn, elem_parsers) when is_function(nelems_fn, 1) do
