@@ -24,7 +24,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   @spec decode(binary) :: {non_neg_integer, String.t, %{}}
   def decode(data) do
     <<_version, rest :: binary>> = data
-    rest |> decode_document |> elem(0)
+    decode_document(rest)
   end
 
   @doc """
