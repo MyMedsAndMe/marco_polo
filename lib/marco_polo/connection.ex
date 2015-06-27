@@ -92,21 +92,18 @@ defmodule MarcoPolo.Connection do
 
     data = s.tail <> msg
 
-    case Protocol.parse_resp(op_name, data) do
+    s = case Protocol.parse_resp(op_name, data) do
       :incomplete ->
-        s = %{s | tail: data}
-        {:noreply, s}
+        %{s | tail: data}
       {:error, %Error{} = error, rest} ->
-        s = %{s | tail: rest}
-        s = %{s | queue: new_queue}
         Connection.reply(from, error)
-        {:noreply, s}
+        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
       {:ok, ^sid, resp, rest} ->
-        s = %{s | tail: rest}
-        s = %{s | queue: new_queue}
         Connection.reply(from, resp)
-        {:noreply, s}
+        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
     end
+
+    {:noreply, s}
   end
 
   def handle_info({:tcp_closed, socket}, %{socket: socket} = s) do
