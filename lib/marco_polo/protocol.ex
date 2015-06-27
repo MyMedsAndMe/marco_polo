@@ -142,27 +142,21 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:db_open, data) do
     parsers = [
-      &parse(&1, :int),
-      &parse(&1, :bytes),
-      &parse(&1, :short),
+      &parse(&1, :int),   # sid
+      &parse(&1, :bytes), # token
+      GenericParser.array_parser(
+        &parse(&1, :short),                       # number of clusters
+        [&parse(&1, :string), &parse(&1, :short)] # cluster name + cluster id
+      ),
+      &parse(&1, :bytes), # cluster config
+      &parse(&1, :string), # orientdb release
     ]
 
     case GenericParser.parse(data, parsers) do
+      {[sid, token, _clusters, _config, _release], rest} ->
+        {[sid, token], rest}
       :incomplete ->
         :incomplete
-      {[sid, token, num_of_clusters], rest} ->
-        cluster_parsers = [&parse(&1, :string), &parse(&1, :short)]
-        case GenericParser.parse(rest, [{:array, num_of_clusters, cluster_parsers}]) do
-          :incomplete ->
-            :incomplete
-          {[clusters], rest} ->
-            case GenericParser.parse(rest, [&parse(&1, :bytes), &parse(&1, :string)]) do
-              :incomplete ->
-                :incomplete
-              {_, rest} ->
-                {[sid, token], rest}
-            end
-        end
     end
   end
 
@@ -171,7 +165,7 @@ defmodule MarcoPolo.Protocol do
   defp parse_resp_contents(:db_exist, data) do
     case parse(data, :byte) do
       {exists?, rest} -> {exists? == 1, rest}
-      :incomplete -> :incomplete
+      :incomplete     -> :incomplete
     end
   end
 
@@ -181,9 +175,10 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:db_countrecords, data), do: parse(data, :long)
 
-  defp parse_resp_contents(:db_reload, <<num_of_clusters :: short, rest :: binary>>) do
+  defp parse_resp_contents(:db_reload, data) do
     cluster_parsers = [&parse(&1, :string), &parse(&1, :short)]
-    GenericParser.parse(rest, [{:array, num_of_clusters, cluster_parsers}])
+    array_parser    = GenericParser.array_parser(&parse(&1, :short), cluster_parsers)
+    GenericParser.parse(data, array_parser)
   end
 
   defp parse_resp_contents(:db_reload, _) do
@@ -239,10 +234,11 @@ defmodule MarcoPolo.Protocol do
     :incomplete
   end
 
-  defp parse_resp_to_command(<<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
-    parsers = [{:array, nrecords, [&parse_record_with_rid/1]}, &parse(&1, :byte)]
+  defp parse_resp_to_command(<<type, data :: binary>>) when type in [@list, @set] do
+    parsers = [GenericParser.array_parser(&parse(&1, :int), &parse_record_with_rid/1),
+               &parse(&1, :byte)]
 
-    case GenericParser.parse(rest, parsers) do
+    case GenericParser.parse(data, parsers) do
       # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
       # mentioned in the docs :(
       {[records, 0], rest} -> {records, rest}
