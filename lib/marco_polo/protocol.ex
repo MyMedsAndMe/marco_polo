@@ -26,7 +26,6 @@ defmodule MarcoPolo.Protocol do
 
   @ok    <<0>>
   @error <<1>>
-  @null  <<-1 :: int>>
 
   def encode_op(op_name, args) do
     [req_code(op_name)|Enum.map(args, &encode_term/1)]
@@ -86,17 +85,12 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
-  def parse_header(@ok <> <<sid :: int, rest :: binary>>) do
-    {:ok, sid, rest}
-  end
-
-  def parse_header(@error <> <<_sid :: int, rest :: binary>>) do
-    {:error, rest}
-  end
-
-  def parse_header(_) do
-    :incomplete
-  end
+  def parse_header(@ok <> <<sid :: int, rest :: binary>>),
+    do: {:ok, sid, rest}
+  def parse_header(@error <> <<_sid :: int, rest :: binary>>),
+    do: {:error, rest}
+  def parse_header(_),
+    do: :incomplete
 
   def parse(<<-1 :: int, rest :: binary>>, type) when type in [:string, :bytes] do
     {nil, rest}
@@ -104,10 +98,8 @@ defmodule MarcoPolo.Protocol do
 
   def parse(<<length :: int, data :: binary>>, type) when type in [:string, :bytes] do
     case data do
-      <<parsed :: bytes-size(length), rest :: binary>> ->
-        {parsed, rest}
-      _ ->
-        :incomplete
+      <<parsed :: bytes-size(length), rest :: binary>> -> {parsed, rest}
+      _                                                -> :incomplete
     end
   end
 
@@ -122,11 +114,9 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_errors(<<1, rest :: binary>>, acc) do
-    case GP.parse(rest, List.duplicate(&parse(&1, :string), 2)) do
-      {[class, message], rest} ->
-        parse_errors(rest, [{class, message}|acc])
-      :incomplete ->
-        :incomplete
+    case GP.parse(rest, [&parse(&1, :string), &parse(&1, :string)]) do
+      {[class, message], rest} -> parse_errors(rest, [{class, message}|acc])
+      :incomplete              -> :incomplete
     end
   end
 
@@ -155,10 +145,8 @@ defmodule MarcoPolo.Protocol do
     ]
 
     case GP.parse(data, parsers) do
-      {[sid, token, _clusters, _config, _release], rest} ->
-        {[sid, token], rest}
-      :incomplete ->
-        :incomplete
+      {[sid, token, _clusters, _config, _release], rest} -> {[sid, token], rest}
+      :incomplete                                        -> :incomplete
     end
   end
 
