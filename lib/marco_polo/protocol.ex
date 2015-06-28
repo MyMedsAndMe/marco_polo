@@ -2,7 +2,10 @@ defmodule MarcoPolo.Protocol do
   @moduledoc false
 
   require Integer
+
   import MarcoPolo.Protocol.BinaryHelpers
+
+  alias MarcoPolo.GenericParser, as: GP
   alias MarcoPolo.Error
   alias MarcoPolo.Protocol.RecordSerialization
 
@@ -25,29 +28,10 @@ defmodule MarcoPolo.Protocol do
   @error <<1>>
   @null  <<-1 :: int>>
 
-  @doc """
-  """
   def encode_op(op_name, args) do
     [req_code(op_name)|Enum.map(args, &encode_term/1)]
   end
 
-  @doc """
-  Serializes an Elixir term to an OrientDB term according to the binary
-  protocol.
-
-  Supported Elixir terms are:
-
-    * booleans (`true` and `false`)
-    * `nil`
-    * binaries (hence strings)
-    * integers (by default encoded as "int", but the size of the integer can be
-      specified by "tagging" the integer, e.g., `{:short, 28}` or
-      `{:long, 1000}`).
-    * lists (assumed to be iolists)
-    * raw bytes (with `{:raw, bytes}`)
-
-  """
-  @spec encode_term(encodable_term) :: iodata
   def encode_term(term)
 
   # Booleans.
@@ -77,109 +61,145 @@ defmodule MarcoPolo.Protocol do
   # An entire record.
   def encode_term({:record, record}), do: encode_term(RecordSerialization.encode(record))
 
-  # Modes (sync, async, no_response).
-  def encode_term({:mode, :sync}),        do: <<0>>
-  def encode_term({:mode, :async}),       do: <<0>>
-  def encode_term({:mode, :no_response}), do: <<2>>
-
-  @doc """
-  """
-  @spec parse_connection_header(binary) :: {:ok, sid, binary} | Error.t
-  def parse_connection_header(@ok <> @null <> <<sid :: int, rest :: binary>>),
-    do: {:ok, sid, rest}
-  def parse_connection_header(@error <> @null <> rest),
-    do: %Error{message: "error (binary dump: #{inspect rest})"}
-
-  @doc """
-  """
-  @spec parse_resp(op_name, binary) :: {:ok, sid, binary, binary} | Error.t
-  def parse_resp(op_name, data) do
-    case parse_header(data) do
-      {:ok, sid, rest} ->
-        {:ok, sid, parse_resp_contents(op_name, rest)}
-      {:server_error, rest} ->
-        {errors, _rest} = parse_errors(rest)
-        {:error, Error.from_errors(errors)}
-    end
+  def parse_connection_resp(data, connection_op) do
+    parse_resp(connection_op, data)
   end
 
-  @doc """
-  """
-  @spec parse_header(binary) :: {:ok, sid, binary} | Error.t
-  def parse_header(data)
+  def parse_resp(op_name, data) do
+    case parse_header(data) do
+      :incomplete ->
+        :incomplete
+      {:ok, sid, rest} ->
+        case parse_resp_contents(op_name, rest) do
+          {resp, rest} ->
+            {:ok, sid, resp, rest}
+          :incomplete ->
+            :incomplete
+        end
+      {:error, rest} ->
+        case parse_errors(rest, []) do
+          {errors, rest} ->
+            {:error, Error.from_errors(errors), rest}
+          :incomplete ->
+            :incomplete
+        end
+    end
+  end
 
   def parse_header(@ok <> <<sid :: int, rest :: binary>>) do
     {:ok, sid, rest}
   end
 
   def parse_header(@error <> <<_sid :: int, rest :: binary>>) do
-    {:server_error, rest}
+    {:error, rest}
   end
 
-  @doc """
-  """
-  @spec parse(binary, atom) :: {binary, binary}
+  def parse_header(_) do
+    :incomplete
+  end
+
+  def parse(<<-1 :: int, rest :: binary>>, type) when type in [:string, :bytes] do
+    {nil, rest}
+  end
+
   def parse(<<length :: int, data :: binary>>, type) when type in [:string, :bytes] do
-    <<parsed :: bytes-size(length), rest :: binary>> = data
-    {parsed, rest}
+    case data do
+      <<parsed :: bytes-size(length), rest :: binary>> ->
+        {parsed, rest}
+      _ ->
+        :incomplete
+    end
   end
 
-  defp parse_errors(data, acc \\ [])
+  def parse(<<byte, rest :: binary>>, :byte), do: {byte, rest}
+
+  def parse(<<i :: short, rest :: binary>>, :short), do: {i, rest}
+  def parse(<<i :: int, rest :: binary>>, :int),     do: {i, rest}
+  def parse(<<i :: long, rest :: binary>>, :long),   do: {i, rest}
+
+  def parse(_data, _type) do
+    :incomplete
+  end
 
   defp parse_errors(<<1, rest :: binary>>, acc) do
-    {class, rest}   = parse(rest, :string)
-    {message, rest} = parse(rest, :string)
-    parse_errors(rest, [{class, message}|acc])
+    case GP.parse(rest, List.duplicate(&parse(&1, :string), 2)) do
+      {[class, message], rest} ->
+        parse_errors(rest, [{class, message}|acc])
+      :incomplete ->
+        :incomplete
+    end
   end
 
   defp parse_errors(<<0, rest :: binary>>, acc) do
     # What am I supposed to do with a Java binary dump of the exception?! :(
-    {_dump, rest} = parse(rest, :bytes)
-    {Enum.reverse(acc), rest}
-  end
-
-  defp parse_resp_contents(:db_create, <<>>) do
-    []
-  end
-
-  defp parse_resp_contents(:db_exist, <<exists>>) do
-    [exists == 1]
-  end
-
-  defp parse_resp_contents(:db_drop, <<>>) do
-    []
-  end
-
-  defp parse_resp_contents(:db_size, <<size :: long>>) do
-    [size]
-  end
-
-  defp parse_resp_contents(:db_countrecords, <<count :: long>>) do
-    [count]
-  end
-
-  defp parse_resp_contents(:db_reload, <<num_of_clusters :: short, rest :: binary>>) do
-    Enum.map_reduce 1..num_of_clusters, rest, fn _, acc ->
-      {cluster_name, acc} = parse(acc, :string)
-      <<cluster_id :: short, acc :: binary>> = acc
-      {{cluster_name, cluster_id}, acc}
+    case parse(rest, :bytes) do
+      {_dump, rest} -> {Enum.reverse(acc), rest}
+      :incomplete   -> :incomplete
     end
   end
 
-  defp parse_resp_contents(:record_load, data) do
+  defp parse_resp_contenst(:connect, data) do
+    GP.parse(data, [&parse(&1, :int), &parse(&1, :bytes)])
+  end
+
+  defp parse_resp_contents(:db_open, data) do
+    parsers = [
+      &parse(&1, :int),   # sid
+      &parse(&1, :bytes), # token
+      GP.array_parser(
+        &parse(&1, :short),                       # number of clusters
+        [&parse(&1, :string), &parse(&1, :short)] # cluster name + cluster id
+      ),
+      &parse(&1, :bytes), # cluster config
+      &parse(&1, :string), # orientdb release
+    ]
+
+    case GP.parse(data, parsers) do
+      {[sid, token, _clusters, _config, _release], rest} ->
+        {[sid, token], rest}
+      :incomplete ->
+        :incomplete
+    end
+  end
+
+  defp parse_resp_contents(:db_create, rest), do: {nil, rest}
+
+  defp parse_resp_contents(:db_exist, data) do
+    case parse(data, :byte) do
+      {exists?, rest} -> {exists? == 1, rest}
+      :incomplete     -> :incomplete
+    end
+  end
+
+  defp parse_resp_contents(:db_drop, rest), do: {nil, rest}
+
+  defp parse_resp_contents(:db_size, data), do: parse(data, :long)
+
+  defp parse_resp_contents(:db_countrecords, data), do: parse(data, :long)
+
+  defp parse_resp_contents(:db_reload, data) do
+    cluster_parsers = [&parse(&1, :string), &parse(&1, :short)]
+    array_parser    = GP.array_parser(&parse(&1, :short), cluster_parsers)
+    GP.parse(data, array_parser)
+  end
+
+  defp parse_resp_contents(:db_reload, _) do
+    :incomplete
+  end
+
+  # REQUEST_RECORD_LOAD and REQUEST_RECORD_LOAD_IF_VERSION_NOT_LATEST reply in
+  # the exact same way.
+  defp parse_resp_contents(op, data) when op in [:record_load, :record_load_if_version_not_latest] do
     data |> parse_resp_to_record_load([]) |> Enum.reverse
   end
 
-  defp parse_resp_contents(:record_create, <<cluster_id :: short, cluster_position :: long, record_version :: int, rest :: binary>>) do
-    {"##{cluster_id}:#{cluster_position}", record_version, rest}
+  defp parse_resp_contents(:record_delete, data) do
+    case parse(data, :byte) do
+      {0, rest}   -> {false, rest}
+      {1, rest}   -> {true, rest}
+      :incomplete -> :incomplete
+    end
   end
-
-  defp parse_resp_contents(:record_update, <<record_version :: int, rest :: binary>>) do
-    {record_version, rest}
-  end
-
-  defp parse_resp_contents(:record_delete, <<1>>), do: true
-  defp parse_resp_contents(:record_delete, <<0>>), do: false
 
   @null_result       ?n
   @list              ?l
@@ -192,26 +212,39 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_record_load(<<1, type, version :: int, rest :: binary>>, acc) do
-    {record_content, rest} = parse(rest, :bytes)
-    {class_name, fields} = RecordSerialization.decode(record_content)
-    record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
-    parse_resp_to_record_load(rest, [{record_type(type), record}|acc])
+    parsers = [
+      &parse(&1, :byte),
+      &parse(&1, :int),
+      &parse(&1, :bytes),
+    ]
+
+    case GP.parse(rest, parsers) do
+      {[type, version, record_content], rest} ->
+        {class_name, fields} = RecordSerialization.decode(record_content)
+        record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
+        parse_resp_to_record_load(rest, [{record_type(type), record}|acc])
+      :incomplete ->
+        :incomplete
+    end
   end
 
   defp parse_resp_to_record_load(<<0>>, acc) do
     acc
   end
 
-  defp parse_resp_to_command(<<type, nrecords :: int, rest :: binary>>) when type in [@list, @set] do
-    {records, rest} = Enum.map_reduce List.duplicate(0, nrecords), rest, fn(_, acc) ->
-      parse_record_with_rid(acc)
+  defp parse_resp_to_record_load(_, _acc) do
+    :incomplete
+  end
+
+  defp parse_resp_to_command(<<type, data :: binary>>) when type in [@list, @set] do
+    parsers = [GP.array_parser(&parse(&1, :int), &parse_record_with_rid/1), &parse(&1, :byte)]
+
+    case GP.parse(data, parsers) do
+      # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
+      # mentioned in the docs :(
+      {[records, 0], rest} -> {records, rest}
+      _                    -> :incomplete
     end
-
-    # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
-    # mentioned in the docs :(
-    <<0>> = rest
-
-    records
   end
 
   defp parse_resp_to_command(<<@single_record, rest :: binary>>) do
@@ -224,27 +257,44 @@ defmodule MarcoPolo.Protocol do
     record
   end
 
+  defp parse_resp_to_command(_) do
+    :incomplete
+  end
+
   # Meaning of the first two bytes in a record definition:
   # 0  - full-fledged record
   # -2 - null record
   # -3 - RID only (cluster_id as a short, cluster_position as a long)
 
   defp parse_record_with_rid(<<0 :: short, rest :: binary>>) do
-    <<record_type, _cluster_id :: short, _cluster_position :: long, record_version :: int, rest :: binary>> = rest
-    {record_content, rest} = parse(rest, :bytes)
-    {class_name, fields} = RecordSerialization.decode(record_content)
-    record = %MarcoPolo.Record{class: class_name, fields: fields, version: record_version}
+    parsers = [
+      &parse(&1, :byte),
+      &parse(&1, :short),
+      &parse(&1, :long),
+      &parse(&1, :int),
+      &parse(&1, :bytes)
+    ]
 
-    {{record_type(record_type), record}, rest}
+    case GP.parse(rest, parsers) do
+      {[record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
+        {class_name, fields} = RecordSerialization.decode(record_content)
+        record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
+        {{record_type(record_type), record}, rest}
+      :incomplete ->
+        :incomplete
+    end
   end
 
-  defp parse_record_with_rid(<<-2 :: short, _rest :: binary>>) do
-    nil
+  defp parse_record_with_rid(<<-2 :: short, rest :: binary>>) do
+    {nil, rest}
   end
 
   defp parse_record_with_rid(<<-3 :: short, rest :: binary>>) do
-    <<cluster_id :: short, cluster_position :: long>> = rest
-    {cluster_id, cluster_position}
+    GP.parse(rest, [&parse(&1, :short), &parse(&1, :long)])
+  end
+
+  defp parse_record_with_rid(_) do
+    :incomplete
   end
 
   defp record_type(?d), do: :document

@@ -21,7 +21,8 @@ defmodule MarcoPolo.Connection do
 
   @initial_state %{socket: nil,
                    session_id: nil,
-                   queue: :queue.new}
+                   queue: :queue.new,
+                   tail: ""}
 
   ## Client code.
 
@@ -88,14 +89,20 @@ defmodule MarcoPolo.Connection do
     :inet.setopts(socket, active: :once)
 
     {{:value, {from, op_name}}, new_queue} = :queue.out(s.queue)
-    s = %{s | queue: new_queue}
 
-    resp = case Protocol.parse_resp(op_name, msg) do
-      {:ok, ^sid, resp}         -> resp
-      {:ok, ^sid, _token, resp} -> resp
+    data = s.tail <> msg
+
+    s = case Protocol.parse_resp(op_name, data) do
+      :incomplete ->
+        %{s | tail: data}
+      {:error, %Error{} = error, rest} ->
+        Connection.reply(from, error)
+        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
+      {:ok, ^sid, resp, rest} ->
+        Connection.reply(from, resp)
+        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
     end
 
-    Connection.reply(from, resp)
     {:noreply, s}
   end
 
@@ -127,34 +134,43 @@ defmodule MarcoPolo.Connection do
   defp authenticate(%{opts: opts, socket: socket} = s) do
     user     = Keyword.fetch!(opts, :user)
     password = Keyword.fetch!(opts, :password)
-    token?   = false
 
-    req = case Keyword.fetch!(opts, :connection) do
-      :server ->
-        Protocol.encode_op(:connect, [nil] ++ @connection_args ++ [token?, user, password])
-      {:db, db_name, db_type} ->
-        Protocol.encode_op(:db_open, [nil] ++ @connection_args ++ [token?, db_name, db_type, user, password])
+    {op, args} = case Keyword.fetch!(opts, :connection) do
+      :server                 -> {:connect, [user, password]}
+      {:db, db_name, db_type} -> {:db_open, [db_name, db_type, user, password]}
     end
+
+    # The first `nil` is for the session id, that is required to be nil (-1) for
+    # first-time connections; the `false` literal is for using token-based auth,
+    # which we don't support yet.
+    req = Protocol.encode_op(op, [nil|@connection_args] ++ [false] ++ args)
 
     case :gen_tcp.send(socket, req) do
       :ok ->
-        case :gen_tcp.recv(socket, 0) do
-          {:ok, data}      -> parse_connection_response(data, s)
-          {:error, reason} -> {:tcp_error, reason}
-        end
+        wait_for_connection_response(s, op)
       {:error, reason} ->
         {:tcp_error, reason}
     end
   end
 
-  defp parse_connection_response(data, s) do
-    case Protocol.parse_connection_header(data) do
-      {:ok, sid, rest} ->
-        {_token, _rest} = Protocol.parse(rest, :bytes)
+  defp wait_for_connection_response(%{socket: socket} = s, connection_type) do
+    case :gen_tcp.recv(socket, 0) do
+      {:error, reason} ->
+        {:tcp_error, reason}
+      {:ok, new_data} ->
+        data = s.tail <> new_data
 
-        {:ok, %{s | session_id: sid}}
-      %Error{} = error ->
-        error
+        case Protocol.parse_connection_resp(data, connection_type) do
+          :incomplete ->
+            wait_for_connection_response(%{s | tail: data}, connection_type)
+          {:error, error, rest} ->
+            s = %{s | tail: rest}
+            {error, s}
+          {:ok, -1, [sid, _token], rest} ->
+            s = %{s | session_id: sid}
+            s = %{s | tail: rest}
+            {:ok, s}
+        end
     end
   end
 
@@ -168,10 +184,11 @@ defmodule MarcoPolo.Connection do
   end
 
   defp check_protocol_number(protocol_number) do
-    if protocol_number >= Application.get_env(:marco_polo, :supported_protocol) do
+    supported = Application.get_env(:marco_polo, :supported_protocol)
+    if protocol_number >= supported do
       :ok
     else
-      %Error{message: "unsupported protocol version, the supported version is >= #{protocol_number}"}
+      %Error{message: "unsupported protocol version, the supported version is >= #{supported}"}
     end
   end
 end
