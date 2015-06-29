@@ -135,8 +135,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp decode_type(data, type) when type in [:string, :binary] do
     {len, rest} = :small_ints.decode_zigzag_varint(data)
-    len = len * 8
-    <<string :: bits-size(len), rest :: binary>> = rest
+    <<string :: bytes-size(len), rest :: binary>> = rest
     {string, rest}
   end
 
