@@ -26,7 +26,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   @spec decode(binary) :: {non_neg_integer, String.t, %{}}
   def decode(data) do
     <<_version, rest :: binary>> = data
-    decode_document(rest)
+    decode_embedded(rest)
   end
 
   @doc """
@@ -46,7 +46,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Decodes a document (ODocument). This ODocument can be a "top-level" document
   # or an "embedded" type, since the leading serialization version byte is not
   # decoded here (but in `decode/1`).
-  defp decode_document(data) do
+  defp decode_embedded(data) do
     {class_name, rest}        = decode_type(data, :string)
     {field_definitions, rest} = decode_header(rest)
     {fields, rest}            = decode_fields(rest, field_definitions)
@@ -55,7 +55,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       class_name = nil
     end
 
-    {{class_name, fields}, rest}
+    {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
+    # {{class_name, fields}, rest}
   end
 
   # Decodes an header returning a list of field definitions (which is a list of
@@ -97,14 +98,16 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # `%Field{}` structs (with no `:value` field, they're definitions). Returns a
   # list of `%Field{}`s and the rest of the given data.
   defp decode_fields(data, field_definitions) do
-    Enum.map_reduce field_definitions, data, fn(field_def(name: name) = field, acc) ->
-      if field_def(field, :ptr) == 0 do
+    {fields, rest} = Enum.map_reduce field_definitions, data, fn(field_def(name: name) = f, acc) ->
+      if field_def(f, :ptr) == 0 do
         {{name, nil}, acc}
       else
-        {value, rest} = decode_type(acc, field_def(field, :type))
+        {value, rest} = decode_type(acc, field_def(f, :type))
         {{name, value}, rest}
       end
     end
+
+    {Enum.into(fields, %{}), rest}
   end
 
   # The pointer to the data is just a signed int32.
@@ -114,36 +117,38 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   # Decodes an instance of `type` from `data`.
-  defp decode_type(data, type)
+  # Made public for testing.
+  @doc false
+  def decode_type(data, type)
 
-  defp decode_type(<<0>> <> rest, :boolean), do: {false, rest}
-  defp decode_type(<<1>> <> rest, :boolean), do: {true, rest}
+  def decode_type(<<0>> <> rest, :boolean), do: {false, rest}
+  def decode_type(<<1>> <> rest, :boolean), do: {true, rest}
 
-  defp decode_type(data, type) when type in [:sint16, :sint32, :sint64] do
+  def decode_type(data, type) when type in [:sint16, :sint32, :sint64] do
     :small_ints.decode_zigzag_varint(data)
   end
 
-  defp decode_type(data, :float) do
+  def decode_type(data, :float) do
     <<float :: 32-float, rest :: binary>> = data
     {float, rest}
   end
 
-  defp decode_type(data, :double) do
+  def decode_type(data, :double) do
     <<double :: 64-float, rest :: binary>> = data
     {double, rest}
   end
 
-  defp decode_type(data, type) when type in [:string, :binary] do
+  def decode_type(data, type) when type in [:string, :binary] do
     {len, rest} = :small_ints.decode_zigzag_varint(data)
     <<string :: bytes-size(len), rest :: binary>> = rest
     {string, rest}
   end
 
-  defp decode_type(data, :embedded) do
-    decode_document(data)
+  def decode_type(data, :embedded) do
+    decode_embedded(data)
   end
 
-  defp decode_type(data, type) when type in [:embedded_list, :embedded_set] do
+  def decode_type(data, type) when type in [:embedded_list, :embedded_set] do
     {nitems, rest} = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
@@ -162,7 +167,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp decode_type(data, :embedded_map) do
+  def decode_type(data, :embedded_map) do
     {keys, rest}   = decode_map_header(data)
     {keys_and_values, rest} = decode_map_values(rest, keys)
 
@@ -178,7 +183,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
       {key, acc} = decode_type(acc, :string)
       {ptr, acc} = decode_data_ptr(acc)
-      IO.inspect ptr
       <<type, acc :: binary>> = acc
 
       {map_key(key: key, data_type: int_to_type(type), data_ptr: ptr), acc}
