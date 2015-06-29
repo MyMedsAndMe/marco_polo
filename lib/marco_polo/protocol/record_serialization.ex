@@ -6,6 +6,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
   Record.defrecordp :typed_field, [:value, :type]
 
+  Record.defrecordp :field_def, [:name, :ptr, :type]
+
   defmodule Field do
     @type t :: %__MODULE__{
       name: binary,
@@ -79,14 +81,15 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  # Decodes the definition of a named field in the header (`data`). Returns a
-  # `%Field{}` struct with an empty value.
+  # Decodes the definition of a named field in the header (`data`).
   defp decode_field_definition(:named_field, data) do
     {field_name, rest}            = decode_type(data, :string)
     {data_ptr, rest}              = decode_data_ptr(rest)
     <<data_type, rest :: binary>> = rest
 
-    field = %Field{name: field_name, type: int_to_type(data_type), pointer_to_data: data_ptr}
+    # field = %Field{name: field_name, type: int_to_type(data_type), pointer_to_data: data_ptr}
+
+    field = field_def(name: field_name, type: int_to_type(data_type), ptr: data_ptr)
     {field, rest}
   end
 
@@ -94,12 +97,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # `%Field{}` structs (with no `:value` field, they're definitions). Returns a
   # list of `%Field{}`s and the rest of the given data.
   defp decode_fields(data, field_definitions) do
-    Enum.map_reduce field_definitions, data, fn(%Field{} = field, acc) ->
-      if field.pointer_to_data == 0 do
-        {%{field | value: nil}, acc}
+    Enum.map_reduce field_definitions, data, fn(field_def(name: name) = field, acc) ->
+      if field_def(field, :ptr) == 0 do
+        {{name, nil}, acc}
       else
-        {value, rest} = decode_type(acc, field.type)
-        {%{field | value: value}, rest}
+        {value, rest} = decode_type(acc, field_def(field, :type))
+        {{name, value}, rest}
       end
     end
   end
