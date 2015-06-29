@@ -26,7 +26,8 @@ defmodule MarcoPolo.Mixfile do
   end
 
   defp deps do
-    [{:connection, github: "fishcakez/connection"},
+    [{:decimal, "~> 1.1.0"},
+     {:connection, github: "fishcakez/connection"},
      {:small_ints, github: "whatyouhide/small_ints"}]
   end
 
