@@ -148,7 +148,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     decode_embedded(data)
   end
 
-  def decode_type(data, type) when type in [:embedded_list, :embedded_set] do
+  def decode_type(data, :embedded_list) do
     {nitems, rest} = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
@@ -165,6 +165,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       <<type, acc :: binary>> = acc
       decode_type(acc, int_to_type(type))
     end
+  end
+
+  def decode_type(data, :embedded_set) do
+    {elems, rest} = decode_type(data, :embedded_list)
+    {Enum.into(elems, HashSet.new), rest}
   end
 
   def decode_type(data, :embedded_map) do

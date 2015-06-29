@@ -27,6 +27,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                         24,           # field value (int with zigzag)
                         "rest">>
 
+  @list <<4,            # number of items (zigzag, hence 2)
+          23,           # type of the elems in the list, OrientDB only supports ANY
+          7, 8, "elem", # elem type (string) + value
+          0, 1,         # elem type (boolean) + value
+          "foo">>
+
   # Throughout these tests, remember that ints are encoded as ZigZag and then as
   # varints (often they're just the double of what they should be because of
   # ZigZag).
@@ -84,13 +90,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: embedded lists" do
-    data = <<4,            # number of items (zigzag, hence 2)
-             23,           # type of the elems in the list, OrientDB only supports ANY
-             7, 8, "elem", # elem type (string) + value
-             0, 1,         # elem type (boolean) + value
-             "foo">>
+    assert Ser.decode_type(@list, :embedded_list) == {["elem", true], "foo"}
+  end
 
-    assert Ser.decode_type(data, :embedded_list) == {["elem", true], "foo"}
+  test "decode_type/2: embedded sets" do
+    expected_set = Enum.into(["elem", true], HashSet.new)
+    assert Ser.decode_type(@list, :embedded_set) == {expected_set, "foo"}
   end
 
   test "decode_type/2: embedded maps" do
