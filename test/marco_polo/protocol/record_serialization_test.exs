@@ -3,6 +3,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   alias MarcoPolo.RID
   alias MarcoPolo.Record
+  alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
   @record_no_fields <<0,           # version
@@ -80,6 +81,13 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     # binary
     assert decode_type(<<4, 77, 45, "foo">>, :binary) == {<<77, 45>>, "foo"}
+  end
+
+  test "decode_type/2: datetime" do
+    data = :small_ints.encode_zigzag_varint(1435665809901) <> "foo"
+    datetime = %DateTime{year: 2015, month: 6, day: 30,
+                         hour: 12, min: 03, sec: 29, msec: 901}
+    assert Ser.decode_type(data, :datetime) == {datetime, "foo"}
   end
 
   test "decode_type/2: embedded documents" do

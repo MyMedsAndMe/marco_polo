@@ -144,6 +144,20 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {string, rest}
   end
 
+  def decode_type(data, :datetime) do
+    {msecs_from_epoch, rest} = decode_type(data, :long)
+    secs_from_epoch = div(msecs_from_epoch, 1000)
+    msec = rem(msecs_from_epoch, 1000)
+    epoch = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
+
+    total_secs = epoch + secs_from_epoch
+    {{year, month, day}, {hour, min, sec}} = :calendar.gregorian_seconds_to_datetime(total_secs)
+    datetime = %MarcoPolo.DateTime{year: year, month: month, day: day,
+                                   hour: hour, min: min, sec: sec, msec: msec}
+
+    {datetime, rest}
+  end
+
   def decode_type(data, :embedded) do
     decode_embedded(data)
   end
