@@ -128,7 +128,7 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
-  defp parse_resp_contenst(:connect, data) do
+  defp parse_resp_contents(:connect, data) do
     GP.parse(data, [&parse(&1, :int), &parse(&1, :bytes)])
   end
 
@@ -171,10 +171,6 @@ defmodule MarcoPolo.Protocol do
     GP.parse(data, array_parser)
   end
 
-  defp parse_resp_contents(:db_reload, _) do
-    :incomplete
-  end
-
   # REQUEST_RECORD_LOAD and REQUEST_RECORD_LOAD_IF_VERSION_NOT_LATEST reply in
   # the exact same way.
   defp parse_resp_contents(op, data) when op in [:record_load, :record_load_if_version_not_latest] do
@@ -199,11 +195,11 @@ defmodule MarcoPolo.Protocol do
     parse_resp_to_command(data)
   end
 
-  defp parse_resp_to_record_load(<<1, type, version :: int, rest :: binary>>, acc) do
+  defp parse_resp_to_record_load(<<1, rest :: binary>>, acc) do
     parsers = [
-      &parse(&1, :byte),
-      &parse(&1, :int),
-      &parse(&1, :bytes),
+      &parse(&1, :byte),  # version
+      &parse(&1, :int),   # type
+      &parse(&1, :bytes), # contents
     ]
 
     case GP.parse(rest, parsers) do
