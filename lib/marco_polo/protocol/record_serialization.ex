@@ -179,6 +179,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Enum.into(keys_and_values, %{}), rest}
   end
 
+  def decode_type(<<cluster_id :: 32, position :: 32, rest :: binary>>, :link) do
+    {%MarcoPolo.RID{cluster_id: cluster_id, position: position}, rest}
+  end
+
   def decode_type(data, :decimal) do
     <<scale :: 32, value_size :: 32, rest :: binary>> = data
     nbits = value_size * 8

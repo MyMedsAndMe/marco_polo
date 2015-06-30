@@ -1,6 +1,7 @@
 defmodule MarcoPolo.Protocol.RecordSerializationTest do
   use ExUnit.Case, async: true
 
+  alias MarcoPolo.RID
   alias MarcoPolo.Record
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
@@ -113,6 +114,11 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     map = %{"key1" => "value", "key2" => nil}
     assert Ser.decode_type(data, :embedded_map) == {map, "foo"}
+  end
+
+  test "decode_type/2: links" do
+    rid = %RID{cluster_id: 101, position: 99}
+    assert Ser.decode_type(<<101 :: 32, 99 :: 32, "foo">>, :link) == {rid, "foo"}
   end
 
   test "decode_type/2: decimals" do
