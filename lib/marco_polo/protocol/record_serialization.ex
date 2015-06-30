@@ -179,6 +179,15 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Enum.into(keys_and_values, %{}), rest}
   end
 
+  def decode_type(data, :decimal) do
+    <<scale :: 32, value_size :: 32, rest :: binary>> = data
+    nbits = value_size * 8
+    <<value :: size(nbits)-big, rest :: binary>> = rest
+
+    value = value / round(:math.pow(10, scale))
+    {Decimal.new(value), rest}
+  end
+
   defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
 

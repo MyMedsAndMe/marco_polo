@@ -115,6 +115,17 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert Ser.decode_type(data, :embedded_map) == {map, "foo"}
   end
 
+  test "decode_type/2: decimals" do
+    Decimal.set_context(%Decimal.Context{precision: 5})
+
+    data = <<0, 0, 0, 4,   # scale as...4 bytes? why? :(
+             0, 0, 0, 2,   # length of the value bytes as...4 bytes :(
+             <<122, 183>>, # value (31415)
+             "foo">>
+
+    assert Ser.decode_type(data, :decimal) == {Decimal.new(3.1415), "foo"}
+  end
+
   ## Encoding
 
   test "encode_type/2: strings" do
