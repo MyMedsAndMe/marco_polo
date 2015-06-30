@@ -287,18 +287,29 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [encode_type(name, :string), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
-  # Encodes an instance of `type`. Returns an iodata instead of a binary.
+  # Infers the type from the `value` passed to it. Returns an iodata instead of
+  # a binary.
   # Made public for testing.
   @doc false
-  def encode_type(data, type, offset \\ 0)
+  def encode_type(value, offset \\ 0)
 
-  def encode_type(str, type, _) when type in [:string, :binary] and is_binary(str) do
-    [:small_ints.encode_zigzag_varint(byte_size(str)), str]
+  def encode_type(true, _offset),  do: <<1>>
+  def encode_type(false, _offset), do: <<0>>
+
+  def encode_type(binary, _offset) when is_binary(binary) do
+    [:small_ints.encode_zigzag_varint(byte_size(binary)), binary]
   end
 
-  def encode_type(i, type, _) when type in [:sint16, :sint32, :sint64] and is_integer(i) do
+  def encode_type(i, _offset) when is_integer(i) do
     :small_ints.encode_zigzag_varint(i)
   end
+
+  def encode_type({:float, x}, _offset) when is_float(x),
+    do: <<x :: 32-float>>
+  def encode_type({:double, x}, _offset) when is_float(x),
+    do: <<x :: 64-float>>
+  def encode_type(x, _offset) when is_float(x),
+    do: encode_type({:double, x})
 
   def encode_type(map, :embedded_map, offset) when is_map(map) do
     offset = offset + map_header_offset(map)
