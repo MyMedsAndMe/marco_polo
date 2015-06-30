@@ -164,27 +164,27 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   ## Encoding
 
-  test "encode_type/2: simple types" do
-    import Ser, only: [encode_type: 1]
+  test "encode_value/1: simple types" do
+    import Ser, only: [encode_value: 1]
 
     # booleans
-    assert bin(encode_type(true)) == <<1>>
-    assert bin(encode_type(false)) == <<0>>
+    assert bin(encode_value(true)) == <<1>>
+    assert bin(encode_value(false)) == <<0>>
 
     # strings and binaries
-    assert bin(encode_type("foo"))         == <<6, "foo">>
-    assert bin(encode_type(<<0, 100, 1>>)) == <<6, 0, 100, 1>>
+    assert bin(encode_value("foo"))         == <<6, "foo">>
+    assert bin(encode_value(<<0, 100, 1>>)) == <<6, 0, 100, 1>>
 
     # ints
-    assert bin(encode_type(1)) == <<2>>
-    assert bin(encode_type(1010)) == :small_ints.encode_zigzag_varint(1010)
-    assert bin(encode_type(123456)) == :small_ints.encode_zigzag_varint(123456)
+    assert bin(encode_value(1)) == <<2>>
+    assert bin(encode_value(1010)) == :small_ints.encode_zigzag_varint(1010)
+    assert bin(encode_value(123456)) == :small_ints.encode_zigzag_varint(123456)
 
     # floats and doubles
     # (Elixir floats are always encoded as OrientDB doubles - 8 bytes)
-    assert bin(encode_type(3.14)) == <<64, 9, 30, 184, 81, 235, 133, 31>>
-    assert bin(encode_type({:float, 3.14})) == <<64, 72, 245, 195>>
-    assert bin(encode_type({:double, 3.14})) == <<64, 9, 30, 184, 81, 235, 133, 31>>
+    assert bin(encode_value(3.14)) == <<64, 9, 30, 184, 81, 235, 133, 31>>
+    assert bin(encode_value({:float, 3.14})) == <<64, 72, 245, 195>>
+    assert bin(encode_value({:double, 3.14})) == <<64, 9, 30, 184, 81, 235, 133, 31>>
   end
 
   defp bin(iodata) do

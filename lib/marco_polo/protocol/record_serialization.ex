@@ -35,8 +35,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   `class_name` is a string containing the class name of the record being
   encoded. `fields` is a list of `Field` structs.
   """
-  def encode({class_name, fields}) do
-    version_and_class = [0, encode_type(class_name || "", :string)]
+  def encode(%MarcoPolo.Record{class: class, fields: fields}) do
+    version_and_class = [0, encode_value(class)]
     offset            = IO.iodata_length(version_and_class)
     encoded_fields    = encode_fields(fields, offset)
 
@@ -246,7 +246,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp encode_fields(fields, offset) do
+  defp encode_fields(%{} = fields, offset) do
     offset = offset + header_offset(fields)
 
     {fields, values, _} = Enum.reduce fields, {[], [], offset}, fn(%Field{} = field, {fs, vs, index}) ->
@@ -284,48 +284,51 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       ptr = 0
     end
 
-    [encode_type(name, :string), <<ptr :: 32-signed>>, type_to_int(type)]
+    [encode_value(name), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
-  # Infers the type from the `value` passed to it. Returns an iodata instead of
-  # a binary.
-  # Made public for testing.
   @doc false
-  def encode_type(value, offset \\ 0)
+  def encode_value(value, offset \\ 0)
 
-  def encode_type(true, _offset),  do: <<1>>
-  def encode_type(false, _offset), do: <<0>>
+  def encode_value({type, value}, offset) do
+    encode_type(value, type, offset)
+  end
 
-  def encode_type(binary, _offset) when is_binary(binary) do
+  def encode_value(value, offset) do
+    encode_type(value, infer_type(value), offset)
+  end
+
+  defp encode_type(value, type, offset)
+
+  defp encode_type(true, :boolean, _offset),  do: <<1>>
+  defp encode_type(false, :boolean, _offset), do: <<0>>
+
+  defp encode_type(binary, type, _offset) when type in [:string, :binary] do
     [:small_ints.encode_zigzag_varint(byte_size(binary)), binary]
   end
 
-  def encode_type(i, _offset) when is_integer(i) do
+  defp encode_type(i, type, _offset) when type in [:short, :int, :long] do
     :small_ints.encode_zigzag_varint(i)
   end
 
-  def encode_type({:float, x}, _offset) when is_float(x),
-    do: <<x :: 32-float>>
-  def encode_type({:double, x}, _offset) when is_float(x),
-    do: <<x :: 64-float>>
-  def encode_type(x, _offset) when is_float(x),
-    do: encode_type({:double, x})
+  defp encode_type(x, :float, _offset), do: <<x :: 32-float>>
+  defp encode_type(x, :double, _offset), do: <<x :: 64-float>>
 
-  def encode_type(map, :embedded_map, offset) when is_map(map) do
-    offset = offset + map_header_offset(map)
+  # defp encode_type(map, :embedded_map, offset) when is_map(map) do
+  #   offset = offset + map_header_offset(map)
 
-    {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
-      typed_field(value: value, type: type) = value
-      encoded_value = encode_type(value, type)
-      key = [type_to_int(:string), encode_type(key, :string), <<index :: 32-signed>>, type_to_int(type)]
-      index = index + IO.iodata_length(encoded_value)
-      {[key|ks], [encoded_value|vs], index}
-    end
+  #   {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
+  #     typed_field(value: value, type: type) = value
+  #     encoded_value = encode_type(value, type)
+  #     key = [type_to_int(:string), encode_type(key, :string), <<index :: 32-signed>>, type_to_int(type)]
+  #     index = index + IO.iodata_length(encoded_value)
+  #     {[key|ks], [encoded_value|vs], index}
+  #   end
 
-    nkeys = map |> Map.keys |> Enum.count |> :small_ints.encode_zigzag_varint
+  #   nkeys = map |> Map.keys |> Enum.count |> :small_ints.encode_zigzag_varint
 
-    [nkeys, keys, values]
-  end
+  #   [nkeys, keys, values]
+  # end
 
   defp map_header_offset(map) do
     keys = Map.keys(map)
@@ -337,6 +340,21 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     byte_size(nkeys) + Enum.sum(key_lengths)
   end
+
+  defp infer_type(value)
+
+  defp infer_type(val) when is_boolean(val), do: :boolean
+  defp infer_type(val) when is_binary(val),  do: :string
+  defp infer_type(val) when is_integer(val), do: :int
+  defp infer_type(val) when is_float(val),   do: :double
+  defp infer_type(val) when is_list(val),    do: :embedded_list
+  defp infer_type(val) when is_map(val),     do: :embedded_map
+  defp infer_type(%HashSet{}),               do: :embedded_set
+  defp infer_type(%MarcoPolo.Record{}),      do: :embedded
+  defp infer_type(%MarcoPolo.RID{}),         do: :link
+  defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
+  defp infer_type(%Decimal{}),               do: :decimal
+  defp infer_type({type, _value}), do: type
 
   # http://orientdb.com/docs/last/Types.html
   @types [
