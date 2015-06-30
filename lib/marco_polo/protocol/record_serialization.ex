@@ -197,6 +197,20 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {%MarcoPolo.RID{cluster_id: cluster_id, position: position}, rest}
   end
 
+  def decode_type(data, :link_list) do
+    {nelems, rest} = :small_ints.decode_zigzag_varint(data)
+    {elems, rest} = Enum.map_reduce List.duplicate(0, nelems), rest, fn(_, acc) ->
+      decode_type(acc, :link)
+    end
+
+    {{:link_list, elems}, rest}
+  end
+
+  def decode_type(data, :link_set) do
+    {{:link_list, elems}, rest} = decode_type(data, :link_list)
+    {{:link_set, Enum.into(elems, HashSet.new)}, rest}
+  end
+
   def decode_type(data, :decimal) do
     <<scale :: 32, value_size :: 32, rest :: binary>> = data
     nbits = value_size * 8

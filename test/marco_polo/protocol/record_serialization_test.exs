@@ -129,6 +129,28 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert Ser.decode_type(<<101 :: 32, 99 :: 32, "foo">>, :link) == {rid, "foo"}
   end
 
+  test "decode_type/2: link lists" do
+    data = <<4, # number of elements as a zigzag varint
+             1 :: 32, 2 :: 32, # link
+             8 :: 32, 9 :: 32, # link
+             "foo">>
+
+    list = {:link_list, [%RID{cluster_id: 1, position: 2}, %RID{cluster_id: 8, position: 9}]}
+    assert Ser.decode_type(data, :link_list) == {list, "foo"}
+  end
+
+  test "decode_type/2: link sets" do
+    data = <<4, # number of elements as a zigzag varint
+             0 :: 32, 1 :: 32, # link
+             9 :: 32, 9 :: 32, # link
+             "foo">>
+
+    links = [%RID{cluster_id: 9, position: 9}, %RID{cluster_id: 0, position: 1}]
+    expected_set   = Enum.into(links, HashSet.new)
+    assert {{:link_set, set}, "foo"} = Ser.decode_type(data, :link_set)
+    assert Set.equal?(expected_set, set)
+  end
+
   test "decode_type/2: decimals" do
     Decimal.set_context(%Decimal.Context{precision: 5})
 
