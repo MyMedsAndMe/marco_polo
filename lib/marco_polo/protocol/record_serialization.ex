@@ -35,12 +35,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   `class_name` is a string containing the class name of the record being
   encoded. `fields` is a list of `Field` structs.
   """
-  def encode(%MarcoPolo.Record{class: class, fields: fields}) do
-    version_and_class = [0, encode_value(class)]
-    offset            = IO.iodata_length(version_and_class)
-    encoded_fields    = encode_fields(fields, offset)
-
-    [version_and_class, encoded_fields]
+  def encode(%MarcoPolo.Record{} = record) do
+    [0, encode_embedded(record, 1)]
   end
 
   # Decodes a document (ODocument). This ODocument can be a "top-level" document
@@ -246,6 +242,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
+  defp encode_embedded(%MarcoPolo.Record{class: class, fields: fields}) do
+    version_and_class = [0, encode_value(class)]
+    offset            = IO.iodata_length(version_and_class)
+    encoded_fields    = encode_fields(fields, offset)
+
+    [version_and_class, encoded_fields]
+  end
+
   defp encode_fields(%{} = fields, offset) do
     offset = offset + header_offset(fields)
 
@@ -268,6 +272,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     |> Enum.map(&(&1 |> encode_field_for_header |> IO.iodata_length))
     |> Enum.sum
     |> +(1)
+  end
+
+  defp encode_embedded(record, offset) do
   end
 
   # Returns the given `%Field{}` with the `:encoded_value` field set to the
@@ -314,6 +321,26 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_type(x, :float, _offset), do: <<x :: 32-float>>
   defp encode_type(x, :double, _offset), do: <<x :: 64-float>>
 
+  defp encode_type(dt, :datetime, _offset) do
+    datetime = {{dt.year, dt.month, dt.day}, {dt.hour, dt.min, dt.sec}}
+    secs     = :calendar.datetime_to_gregorian_seconds(datetime)
+    epoch    = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
+
+    encode_type((secs - epoch) * 1000 + dt.msec, :long, 0)
+  end
+
+  defp encode_type(list, :embedded_list, offset) do
+    elems = Enum.map list, fn(el) ->
+      [type_to_int(infer_type(el)), encode_value(el, offset)]
+    end
+
+    [:small_ints.encode_zigzag_varint(length(list)), type_to_int(:any), elems]
+  end
+
+  defp encode_type(set, :embedded_set, offset) do
+    encode_type(Set.to_list(set), :embedded_list, offset)
+  end
+
   # defp encode_type(map, :embedded_map, offset) when is_map(map) do
   #   offset = offset + map_header_offset(map)
 
@@ -343,17 +370,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp infer_type(value)
 
+  defp infer_type(%HashSet{}),               do: :embedded_set
+  defp infer_type(%MarcoPolo.Record{}),      do: :embedded
+  defp infer_type(%MarcoPolo.RID{}),         do: :link
+  defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
+  defp infer_type(%Decimal{}),               do: :decimal
   defp infer_type(val) when is_boolean(val), do: :boolean
   defp infer_type(val) when is_binary(val),  do: :string
   defp infer_type(val) when is_integer(val), do: :int
   defp infer_type(val) when is_float(val),   do: :double
   defp infer_type(val) when is_list(val),    do: :embedded_list
   defp infer_type(val) when is_map(val),     do: :embedded_map
-  defp infer_type(%HashSet{}),               do: :embedded_set
-  defp infer_type(%MarcoPolo.Record{}),      do: :embedded
-  defp infer_type(%MarcoPolo.RID{}),         do: :link
-  defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
-  defp infer_type(%Decimal{}),               do: :decimal
   defp infer_type({type, _value}), do: type
 
   # http://orientdb.com/docs/last/Types.html

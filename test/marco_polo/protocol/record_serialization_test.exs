@@ -187,6 +187,33 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value({:double, 3.14})) == <<64, 9, 30, 184, 81, 235, 133, 31>>
   end
 
+  test "encode_value/1: datetime" do
+    import Ser, only: [encode_value: 1]
+
+    datetime = %DateTime{year: 2015, month: 6, day: 30,
+                         hour: 12, min: 03, sec: 29, msec: 901}
+    assert bin(encode_value(datetime)) == :small_ints.encode_zigzag_varint(1435665809901)
+  end
+
+  test "encode_value/1: embedded lists" do
+    import Ser, only: [encode_value: 1]
+
+    assert (bin(encode_value(["elem", true])) <> "foo") == @list
+  end
+
+  test "encode_value/1: embedded sets" do
+    import Ser, only: [encode_value: 1]
+
+    expected = <<4,            # number of items (zigzag, hence 2)
+                 23,           # type of the elems in the list, OrientDB only supports ANY
+                 0, 1,         # elem type (boolean) + value
+                 7, 8, "elem", # elem type (string) + value
+                 >>
+
+    set = Enum.into([true, "elem"], HashSet.new)
+    assert bin(encode_value(set)) == expected
+  end
+
   defp bin(iodata) do
     IO.iodata_to_binary(iodata)
   end
