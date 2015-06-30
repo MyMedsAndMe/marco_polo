@@ -6,6 +6,8 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
+  import Ser, only: [encode_value: 1, decode_type: 2]
+
   @record_no_fields <<0,           # version
                       10, "Klass", # class name
                       0,           # end of (empty) header
@@ -57,8 +59,6 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: simple types" do
-    import Ser, only: [decode_type: 2]
-
     # booleans
     assert decode_type(<<0, "foo">>, :boolean) == {false, "foo"}
     assert decode_type(<<1, "foo">>, :boolean) == {true, "foo"}
@@ -87,24 +87,24 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     data = :small_ints.encode_zigzag_varint(1435665809901) <> "foo"
     datetime = %DateTime{year: 2015, month: 6, day: 30,
                          hour: 12, min: 03, sec: 29, msec: 901}
-    assert Ser.decode_type(data, :datetime) == {datetime, "foo"}
+    assert decode_type(data, :datetime) == {datetime, "foo"}
   end
 
   test "decode_type/2: embedded documents" do
     # Embedded documents have no serialization version
     <<_version, record :: bytes>> = @record_with_fields
 
-    assert Ser.decode_type(record, :embedded) ==
+    assert decode_type(record, :embedded) ==
            {%Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
   end
 
   test "decode_type/2: embedded lists" do
-    assert Ser.decode_type(@list, :embedded_list) == {["elem", true], "foo"}
+    assert decode_type(@list, :embedded_list) == {["elem", true], "foo"}
   end
 
   test "decode_type/2: embedded sets" do
     expected_set = Enum.into(["elem", true], HashSet.new)
-    assert Ser.decode_type(@list, :embedded_set) == {expected_set, "foo"}
+    assert decode_type(@list, :embedded_set) == {expected_set, "foo"}
   end
 
   test "decode_type/2: embedded maps" do
@@ -121,12 +121,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
              "foo">>
 
     map = %{"key1" => "value", "key2" => nil}
-    assert Ser.decode_type(data, :embedded_map) == {map, "foo"}
+    assert decode_type(data, :embedded_map) == {map, "foo"}
   end
 
   test "decode_type/2: links" do
     rid = %RID{cluster_id: 101, position: 99}
-    assert Ser.decode_type(<<101 :: 32, 99 :: 32, "foo">>, :link) == {rid, "foo"}
+    assert decode_type(<<101 :: 32, 99 :: 32, "foo">>, :link) == {rid, "foo"}
   end
 
   test "decode_type/2: link lists" do
@@ -136,7 +136,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
              "foo">>
 
     list = {:link_list, [%RID{cluster_id: 1, position: 2}, %RID{cluster_id: 8, position: 9}]}
-    assert Ser.decode_type(data, :link_list) == {list, "foo"}
+    assert decode_type(data, :link_list) == {list, "foo"}
   end
 
   test "decode_type/2: link sets" do
@@ -159,14 +159,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
              <<122, 183>>, # value (31415)
              "foo">>
 
-    assert Ser.decode_type(data, :decimal) == {Decimal.new(3.1415), "foo"}
+    assert decode_type(data, :decimal) == {Decimal.new(3.1415), "foo"}
   end
 
   ## Encoding
 
   test "encode_value/1: simple types" do
-    import Ser, only: [encode_value: 1]
-
     # booleans
     assert bin(encode_value(true)) == <<1>>
     assert bin(encode_value(false)) == <<0>>
@@ -188,22 +186,16 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "encode_value/1: datetime" do
-    import Ser, only: [encode_value: 1]
-
     datetime = %DateTime{year: 2015, month: 6, day: 30,
                          hour: 12, min: 03, sec: 29, msec: 901}
     assert bin(encode_value(datetime)) == :small_ints.encode_zigzag_varint(1435665809901)
   end
 
   test "encode_value/1: embedded lists" do
-    import Ser, only: [encode_value: 1]
-
     assert (bin(encode_value(["elem", true])) <> "foo") == @list
   end
 
   test "encode_value/1: embedded sets" do
-    import Ser, only: [encode_value: 1]
-
     expected = <<4,            # number of items (zigzag, hence 2)
                  23,           # type of the elems in the list, OrientDB only supports ANY
                  0, 1,         # elem type (boolean) + value
