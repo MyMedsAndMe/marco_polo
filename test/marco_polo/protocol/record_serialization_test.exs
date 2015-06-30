@@ -62,9 +62,9 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert decode_type(<<1, "foo">>, :boolean) == {true, "foo"}
 
     # integers (with zigzag + varint)
-    assert decode_type(<<6, "foo">>, :sint16)  == {3, "foo"}
-    assert decode_type(<<44, "foo">>, :sint32) == {22, "foo"}
-    assert decode_type(<<1, "foo">>, :sint64)  == {-1, "foo"}
+    assert decode_type(<<6, "foo">>, :short) == {3, "foo"}
+    assert decode_type(<<44, "foo">>, :int)  == {22, "foo"}
+    assert decode_type(<<1, "foo">>, :long)  == {-1, "foo"}
 
     # floats
     assert {float, "foo"} = decode_type(<<64, 72, 245, 195, "foo">>, :float)

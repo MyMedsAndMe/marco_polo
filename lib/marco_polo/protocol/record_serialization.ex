@@ -124,7 +124,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   def decode_type(<<0>> <> rest, :boolean), do: {false, rest}
   def decode_type(<<1>> <> rest, :boolean), do: {true, rest}
 
-  def decode_type(data, type) when type in [:sint16, :sint32, :sint64] do
+  def decode_type(data, type) when type in [:short, :int, :long] do
     :small_ints.decode_zigzag_varint(data)
   end
 
@@ -298,9 +298,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # http://orientdb.com/docs/last/Types.html
   @types [
     boolean: 0,
-    sint32: 1,
-    sint16: 2,
-    sint64: 3,
+    int: 1,
+    short: 2,
+    long: 3,
     float: 4,
     double: 5,
     datetime: 6,
