@@ -242,20 +242,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp encode_embedded(%MarcoPolo.Record{class: class, fields: fields}) do
-    version_and_class = [0, encode_value(class)]
-    offset            = IO.iodata_length(version_and_class)
-    encoded_fields    = encode_fields(fields, offset)
-
-    [version_and_class, encoded_fields]
-  end
-
   defp encode_fields(%{} = fields, offset) do
     offset = offset + header_offset(fields)
 
-    {fields, values, _} = Enum.reduce fields, {[], [], offset}, fn(%Field{} = field, {fs, vs, index}) ->
-      encoded_value = encode_field_value(field, index).encoded_value
-      encoded_field = %{field | pointer_to_data: index} |> encode_field_for_header
+    acc = {[], [], offset}
+    {fields, values, _} = Enum.reduce fields, acc, fn({field_name, field_value}, {fs, vs, index}) ->
+      encoded_value = encode_value(field_value, index)
+      encoded_field = encode_field_for_header(field_name, index, field_value)
       index         = index + IO.iodata_length(encoded_value)
 
       {[encoded_field|fs], [encoded_value|vs], index}
@@ -268,8 +261,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp header_offset(fields) do
     # The last +1 is for the `0` that signals the end of the header.
     fields
-    |> Enum.map(&encode_field_value(&1, 0))
-    |> Enum.map(&(&1 |> encode_field_for_header |> IO.iodata_length))
+    |> Stream.map(fn({name, value}) -> encode_field_for_header(name, 0, value) end)
+    |> Stream.map(&IO.iodata_length/1)
     |> Enum.sum
     |> +(1)
   end
@@ -281,18 +274,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [encoded_class, encoded_fields]
   end
 
-  # Returns the given `%Field{}` with the `:encoded_value` field set to the
-  # result of encoding the `:value` field.
-  defp encode_field_value(%Field{type: type, value: value} = field, offset) do
-    %{field | encoded_value: encode_type(value, type, offset)}
-  end
-
   # Encodes the given `%Field{}` for the header, i.e., just the field
   # representation and not the value (name, pointer to data, type). Returns
   # iodata.
-  defp encode_field_for_header(%Field{pointer_to_data: ptr, type: type, name: name}) do
-    if is_nil(ptr) do
+  defp encode_field_for_header(name, ptr, value) do
+    type = infer_type(value)
+    if is_nil(value) do
       ptr = 0
+      type = :boolean
     end
 
     [encode_value(name), <<ptr :: 32-signed>>, type_to_int(type)]
@@ -349,21 +338,36 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     encode_type(Set.to_list(set), :embedded_list, offset)
   end
 
-  # defp encode_type(map, :embedded_map, offset) when is_map(map) do
-  #   offset = offset + map_header_offset(map)
+  defp encode_type(map, :embedded_map, offset) when is_map(map) do
+    offset = offset + map_header_offset(map)
 
-  #   {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
-  #     typed_field(value: value, type: type) = value
-  #     encoded_value = encode_type(value, type)
-  #     key = [type_to_int(:string), encode_type(key, :string), <<index :: 32-signed>>, type_to_int(type)]
-  #     index = index + IO.iodata_length(encoded_value)
-  #     {[key|ks], [encoded_value|vs], index}
-  #   end
+    {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
+      encoded_value = <<>>
 
-  #   nkeys = map |> Map.keys |> Enum.count |> :small_ints.encode_zigzag_varint
+      if is_nil(value) do
+        key = [type_to_int(:string),
+               encode_value(to_string(key)),
+               <<0 :: 32-signed>>,
+               0]
+      else
+        key = [type_to_int(:string),
+               encode_value(to_string(key)),
+               <<index :: 32-signed>>,
+               type_to_int(infer_type(value))]
+        encoded_value = encode_value(value, index)
+        index = index + IO.iodata_length(encoded_value)
+      end
 
-  #   [nkeys, keys, values]
-  # end
+      {[key|ks], [encoded_value|vs], index}
+    end
+
+    keys   = Enum.reverse(keys)
+    values = Enum.reverse(values)
+
+    nkeys = map |> map_size |> :small_ints.encode_zigzag_varint
+
+    [nkeys, keys, values]
+  end
 
   defp map_header_offset(map) do
     keys = Map.keys(map)
@@ -371,7 +375,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     # `6` means 4 bytes for the pointer to the data, 1 byte for the data type,
     # and 1 byte for the key type.
     nkeys       = :small_ints.encode_zigzag_varint(Enum.count(keys))
-    key_lengths = Enum.map(keys, &(IO.iodata_length(encode_type(&1, :string)) + 6))
+    key_lengths = Enum.map(keys, &(IO.iodata_length(encode_value(to_string(&1))) + 6))
 
     byte_size(nkeys) + Enum.sum(key_lengths)
   end
@@ -389,6 +393,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(val) when is_float(val),   do: :double
   defp infer_type(val) when is_list(val),    do: :embedded_list
   defp infer_type(val) when is_map(val),     do: :embedded_map
+  defp infer_type(val) when is_nil(val),     do: :boolean # irrelevant
   defp infer_type({type, _value}), do: type
 
   # http://orientdb.com/docs/last/Types.html

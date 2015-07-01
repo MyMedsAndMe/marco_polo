@@ -21,10 +21,10 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   @record_with_fields <<0,            # version
                         6, "foo",     # class name
                         10, "hello",  # field name
-                        0, 0, 0, 26,  # pointer to data
+                        0, 0, 0, 25,  # pointer to data
                         7,            # field type (string)
                         6, "int",     # field name
-                        0, 0, 0, 34,  # pointer to data
+                        0, 0, 0, 32,  # pointer to data
                         1,            # field type (int)
                         0,            # end of header
                         12, "world!", # field value
@@ -191,9 +191,15 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(datetime)) == :small_ints.encode_zigzag_varint(1435665809901)
   end
 
-  test "encode_value/1: embedded document" do
+  test "encode_value/1: embedded document with no fields" do
     record = %Record{class: "Klass"}
     <<_version, record_content :: binary>> = @record_no_fields
+    assert bin(encode_value(record)) <> "rest" == record_content
+  end
+
+  test "encode_value/1: embedded document with fields" do
+    record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
+    <<_version, record_content :: binary>> = @record_with_fields
     assert bin(encode_value(record)) <> "rest" == record_content
   end
 
@@ -210,6 +216,33 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     set = Enum.into([true, "elem"], HashSet.new)
     assert bin(encode_value(set)) == expected
+  end
+
+  test "encode_value/1: embedded maps" do
+    # Note: order of keys in Elixir maps cannot be guaranteed, with the map
+    # below it *should* be key2, key1, key3 (I guess because key2 is an
+    # atom?). The test relies on that as there would be no other way to test the
+    # encoding.
+
+    expected = <<6,           # number of keys (zigzag, hence 2)
+                 7,           # key type (string)
+                 8, "key2",   # key
+                 0, 0, 0, 0,  # ptr to data, 0 means null data
+                 0,           # when ptr is null type is always 0 (which is boolean, but irrelevant)
+                 7,           # key type (string)
+                 8, "key1",   # key
+                 0, 0, 0, 34, # ptr to data
+                 7,           # data type (string)
+                 7,           # key type (string)
+                 8, "key3",   # key
+                 0, 0, 0, 40, # ptr to data
+                 1,           # data type (int)
+                 10, "value", # key1 value
+                 22,          # key3 value
+                 >>
+
+    # keys are converted to strings
+    assert bin(encode_value(%{"key1" => "value", :key2 => nil, "key3" => 11})) == expected
   end
 
   defp bin(iodata) do
