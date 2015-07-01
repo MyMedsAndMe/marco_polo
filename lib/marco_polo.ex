@@ -17,10 +17,30 @@ defmodule MarcoPolo do
     Connection.start_link(C, Keyword.merge(@default_opts, opts))
   end
 
-  def db_exists?(conn, db, db_type) do
-    Connection.call(conn, {:operation, :db_exist, [db, db_type]})
+  @doc """
+  Tells whether the database called `name` with the given `type` exists.
+
+  ## Examples
+
+      iex> MarcoPolo.db_exists?(conn, "GratefulDeadConcerts", "plocal")
+      {:ok, true}
+
+  """
+  @spec db_exists?(pid, String.t, String.t) :: {:ok, boolean}
+  def db_exists?(conn, name, type) do
+    Connection.call(conn, {:operation, :db_exist, [name, type]})
   end
 
+  @doc """
+  Reloads the database to which `conn` is connected.
+
+  ## Examples
+
+      iex> MarcoPolo.db_reload(conn)
+      :ok
+
+  """
+  @spec db_reload(pid) :: :ok
   def db_reload(conn) do
     case Connection.call(conn, {:operation, :db_reload, []}) do
       {:ok, _}            -> :ok
@@ -28,10 +48,30 @@ defmodule MarcoPolo do
     end
   end
 
+  @doc """
+  Returns the size of the database to which `conn` is connected.
+
+  ## Examples
+
+      iex> MarcoPolo.db_size(conn)
+      {:ok, 1158891}
+
+  """
+  @spec db_size(pid) :: {:ok, non_neg_integer}
   def db_size(conn) do
     Connection.call(conn, {:operation, :db_size, []})
   end
 
+  @doc """
+  Returns the number of records in the database to which `conn` is connected.
+
+  ## Examples
+
+      iex> MarcoPolo.db_countrecords(conn)
+      {:ok, 7931}
+
+  """
+  @spec db_countrecords(pid) :: {:ok, non_neg_integer}
   def db_countrecords(conn) do
     Connection.call(conn, {:operation, :db_countrecords, []})
   end
