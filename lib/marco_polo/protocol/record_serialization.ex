@@ -361,7 +361,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [nkeys, keys, values]
   end
 
-  defp encode_type(%MarcoPolo.RID{cluster_id: id, position: pos}, :link, offset) do
+  defp encode_type(%MarcoPolo.RID{cluster_id: id, position: pos}, :link, _offset) do
     <<id :: 32, pos :: 32>>
   end
 
