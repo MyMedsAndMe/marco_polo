@@ -99,7 +99,7 @@ defmodule MarcoPolo.Connection do
         Connection.reply(from, error)
         s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
       {:ok, ^sid, resp, rest} ->
-        Connection.reply(from, resp)
+        Connection.reply(from, {:ok, resp})
         s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
     end
 
