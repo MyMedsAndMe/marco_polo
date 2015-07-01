@@ -8,18 +8,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   Record.defrecordp :field_def, [:name, :ptr, :type]
 
-  defmodule Field do
-    @type t :: %__MODULE__{
-      name: binary,
-      type: atom,
-      pointer_to_data: non_neg_integer,
-      value: term,
-      encoded_value: iodata,
-    }
-
-    defstruct ~w(name type pointer_to_data value encoded_value)a
-  end
-
   @doc """
   Parses a binary-serialized record.
   """
@@ -30,10 +18,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   @doc """
-  Serializes a record using the binary serialization protocol.
-
-  `class_name` is a string containing the class name of the record being
-  encoded. `fields` is a list of `Field` structs.
   """
   def encode(%MarcoPolo.Record{} = record) do
     [0, encode_embedded(record, 1)]
@@ -55,8 +39,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     # {{class_name, fields}, rest}
   end
 
-  # Decodes an header returning a list of field definitions (which is a list of
-  # `%Field{}` structs).
   defp decode_header(data, acc \\ []) do
     {i, rest} = :small_ints.decode_zigzag_varint(data)
 
@@ -84,15 +66,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {data_ptr, rest}              = decode_data_ptr(rest)
     <<data_type, rest :: binary>> = rest
 
-    # field = %Field{name: field_name, type: int_to_type(data_type), pointer_to_data: data_ptr}
-
     field = field_def(name: field_name, type: int_to_type(data_type), ptr: data_ptr)
     {field, rest}
   end
 
-  # Decodes fields from the body of a serialized document (`data`) and a list of
-  # `%Field{}` structs (with no `:value` field, they're definitions). Returns a
-  # list of `%Field{}`s and the rest of the given data.
   defp decode_fields(data, field_definitions) do
     {fields, rest} = Enum.map_reduce field_definitions, data, fn(field_def(name: name) = f, acc) ->
       if field_def(f, :ptr) == 0 do
@@ -292,9 +269,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [encoded_class, encoded_fields]
   end
 
-  # Encodes the given `%Field{}` for the header, i.e., just the field
-  # representation and not the value (name, pointer to data, type). Returns
-  # iodata.
   defp encode_field_for_header(name, ptr, value) do
     type = infer_type(value)
     if is_nil(value) do
