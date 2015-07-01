@@ -1,5 +1,5 @@
 defmodule MarcoPoloTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
