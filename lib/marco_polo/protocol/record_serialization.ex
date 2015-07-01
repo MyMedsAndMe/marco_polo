@@ -282,6 +282,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp encode_embedded(%MarcoPolo.Record{class: class, fields: fields}, offset) do
+    if is_nil(class) do
+      class = ""
+    end
+
     encoded_class  = encode_value(class, offset)
     encoded_fields = encode_fields(fields, offset + IO.iodata_length(encoded_class))
 
