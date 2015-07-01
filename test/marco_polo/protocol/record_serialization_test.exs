@@ -245,6 +245,22 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(%{"key1" => "value", :key2 => nil, "key3" => 11})) == expected
   end
 
+  test "encode_value/1: links" do
+    rid = %RID{cluster_id: 100, position: 33}
+    assert bin(encode_value(rid)) == <<100 :: 32, 33 :: 32>>
+  end
+
+  test "encode_value/1: link lists and sets" do
+    # Order matters because sets aren't ordered, so I'm testing against real
+    # results.
+    rids     = [%RID{cluster_id: 19, position: 4}, %RID{cluster_id: 0, position: 1}]
+    set      = Enum.into(rids, HashSet.new)
+    expected = <<4, 19 :: 32, 4 :: 32, 0 :: 32, 1 :: 32>>
+
+    assert bin(encode_value({:link_list, rids})) == expected
+    assert bin(encode_value({:link_set, set}))   == expected
+  end
+
   defp bin(iodata) do
     IO.iodata_to_binary(iodata)
   end

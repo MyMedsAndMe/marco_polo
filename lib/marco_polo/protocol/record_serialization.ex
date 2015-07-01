@@ -369,6 +369,21 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [nkeys, keys, values]
   end
 
+  defp encode_type(%MarcoPolo.RID{cluster_id: id, position: pos}, :link, offset) do
+    <<id :: 32, pos :: 32>>
+  end
+
+  defp encode_type(rids, :link_list, offset) do
+    [
+      :small_ints.encode_zigzag_varint(length(rids)),
+      Enum.map(rids, &encode_type(&1, :link, offset))
+    ]
+  end
+
+  defp encode_type(rids, :link_set, offset) do
+    encode_type(Set.to_list(rids), :link_list, offset)
+  end
+
   defp map_header_offset(map) do
     keys = Map.keys(map)
 
