@@ -207,6 +207,20 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {{:link_set, Enum.into(elems, HashSet.new)}, rest}
   end
 
+  def decode_type(data, :link_map) do
+    {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
+    {pairs, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<type, acc :: binary>>) ->
+      # Only string keys are supported
+      :string = int_to_type(type)
+
+      {key, acc} = decode_type(acc, :string)
+      {rid, acc} = decode_type(acc, :link)
+      {{key, rid}, acc}
+    end
+
+    {{:link_map, Enum.into(pairs, %{})}, rest}
+  end
+
   def decode_type(data, :decimal) do
     <<scale :: 32, value_size :: 32, rest :: binary>> = data
     nbits = value_size * 8
@@ -382,6 +396,16 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp encode_type(rids, :link_set, offset) do
     encode_type(Set.to_list(rids), :link_list, offset)
+  end
+
+  defp encode_type(rid_map, :link_map, offset) do
+    keys_and_values = Enum.map rid_map, fn {k, v} ->
+      [type_to_int(:string),
+       encode_value(to_string(k), offset),
+       encode_value(v, offset)]
+    end
+
+    [:small_ints.encode_zigzag_varint(map_size(rid_map)), keys_and_values]
   end
 
   defp map_header_offset(map) do

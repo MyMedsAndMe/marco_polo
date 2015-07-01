@@ -145,10 +145,26 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
              9 :: 32, 9 :: 32, # link
              "foo">>
 
-    links = [%RID{cluster_id: 9, position: 9}, %RID{cluster_id: 0, position: 1}]
-    expected_set   = Enum.into(links, HashSet.new)
+    links        = [%RID{cluster_id: 9, position: 9}, %RID{cluster_id: 0, position: 1}]
+    expected_set = Enum.into(links, HashSet.new)
     assert {{:link_set, set}, "foo"} = Ser.decode_type(data, :link_set)
     assert Set.equal?(expected_set, set)
+  end
+
+  test "decode_type/2: link maps" do
+    expected_map = %{
+      "foo" => %RID{cluster_id: 1, position: 2},
+      "bar" => %RID{cluster_id: 3, position: 9},
+    }
+
+    data = <<4, # nkeys, varint
+             7, 6, "foo", # key type + key value
+             <<1 :: 32, 2 :: 32>>, # rid
+             7, 6, "bar", # key type + key value
+             <<3 :: 32, 9 :: 32>>, # rid
+             "foo">>
+
+    assert decode_type(data, :link_map) == {{:link_map, expected_map}, "foo"}
   end
 
   test "decode_type/2: decimals" do
@@ -259,6 +275,21 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     assert bin(encode_value({:link_list, rids})) == expected
     assert bin(encode_value({:link_set, set}))   == expected
+  end
+
+  test "encode_value/1: link maps" do
+    map = %{
+      :foo  => %RID{cluster_id: 1, position: 2},
+      "bar" => %RID{cluster_id: 3, position: 9},
+    }
+    expected = <<4, # nkeys, varint
+                 7, 6, "foo", # key type + key value
+                 <<1 :: 32, 2 :: 32>>, # rid
+                 7, 6, "bar", # key type + key value
+                 <<3 :: 32, 9 :: 32>>, # rid
+                 >>
+
+    assert bin(encode_value({:link_map, map})) == expected
   end
 
   defp bin(iodata) do
