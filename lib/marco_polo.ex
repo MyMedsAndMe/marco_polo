@@ -6,9 +6,14 @@ defmodule MarcoPolo do
     port: 2424,
   ]
 
+  @doc """
+  """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
-    opts = Keyword.merge(@default_opts, opts)
-    Connection.start_link(C, opts)
+    unless Keyword.get(opts, :connection) do
+      raise ArgumentError, "no connection type (connect/db_open) specified"
+    end
+
+    Connection.start_link(C, Keyword.merge(@default_opts, opts))
   end
 end
