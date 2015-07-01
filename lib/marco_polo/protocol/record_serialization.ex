@@ -274,7 +274,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     |> +(1)
   end
 
-  defp encode_embedded(record, offset) do
+  defp encode_embedded(%MarcoPolo.Record{class: class, fields: fields}, offset) do
+    encoded_class  = encode_value(class, offset)
+    encoded_fields = encode_fields(fields, offset + IO.iodata_length(encoded_class))
+
+    [encoded_class, encoded_fields]
   end
 
   # Returns the given `%Field{}` with the `:encoded_value` field set to the
@@ -327,6 +331,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     epoch    = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
 
     encode_type((secs - epoch) * 1000 + dt.msec, :long, 0)
+  end
+
+  defp encode_type(record, :embedded, offset) do
+    encode_embedded(record, offset)
   end
 
   defp encode_type(list, :embedded_list, offset) do

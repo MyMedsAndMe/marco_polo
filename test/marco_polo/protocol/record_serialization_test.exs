@@ -191,6 +191,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(datetime)) == :small_ints.encode_zigzag_varint(1435665809901)
   end
 
+  test "encode_value/1: embedded document" do
+    record = %Record{class: "Klass"}
+    <<_version, record_content :: binary>> = @record_no_fields
+    assert bin(encode_value(record)) <> "rest" == record_content
+  end
+
   test "encode_value/1: embedded lists" do
     assert (bin(encode_value(["elem", true])) <> "foo") == @list
   end
