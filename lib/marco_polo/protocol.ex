@@ -19,6 +19,7 @@ defmodule MarcoPolo.Protocol do
     | {:int, integer}
     | {:long, integer}
     | {:raw, binary}
+    | MarcoPolo.Record.t
 
   @type sid :: non_neg_integer
   @type op_code :: non_neg_integer
@@ -58,7 +59,7 @@ defmodule MarcoPolo.Protocol do
   def encode_term({:raw, bytes}) when is_binary(bytes) or is_list(bytes), do: bytes
 
   # An entire record.
-  def encode_term({:record, record}), do: encode_term(RecordSerialization.encode(record))
+  def encode_term(%MarcoPolo.Record{} = record), do: encode_term(RecordSerialization.encode(record))
 
   def parse_connection_resp(data, connection_op) do
     parse_resp(connection_op, data)
@@ -174,7 +175,25 @@ defmodule MarcoPolo.Protocol do
   # REQUEST_RECORD_LOAD and REQUEST_RECORD_LOAD_IF_VERSION_NOT_LATEST reply in
   # the exact same way.
   defp parse_resp_contents(op, data) when op in [:record_load, :record_load_if_version_not_latest] do
-    data |> parse_resp_to_record_load([]) |> Enum.reverse
+    parse_resp_to_record_load(data, [])
+  end
+
+  defp parse_resp_contents(:record_create, data) do
+    case GP.parse(data, [&parse(&1, :short), &parse(&1, :long), &parse(&1, :int)]) do
+      {args, rest} ->
+        IO.puts :stderr, """
+        A response to a REQUEST_RECORD_CREATE operation has been parsed, but
+        `GenericParser` hasn't been used. Parsing the end of a
+        REQUEST_RECORD_CREATE operation is a very annoying task, so I'm putting
+        it off for later. For now, we assume that the response is well-formed
+        and not incomplete or abundant (we discard everthing that remains after
+        parsing the rid and the version). For reference, the remaining bytes
+        are: `#{inspect rest}`
+        """
+        {args, ""}
+      :incomplete ->
+        :incomplete
+    end
   end
 
   defp parse_resp_contents(:record_delete, data) do
@@ -204,16 +223,16 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(rest, parsers) do
       {[type, version, record_content], rest} ->
-        {class_name, fields} = RecordSerialization.decode(record_content)
-        record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
-        parse_resp_to_record_load(rest, [{record_type(type), record}|acc])
+        {record, <<>>} = RecordSerialization.decode(record_content)
+        record = %{record | version: version}
+        parse_resp_to_record_load(rest, [record|acc])
       :incomplete ->
         :incomplete
     end
   end
 
-  defp parse_resp_to_record_load(<<0>>, acc) do
-    acc
+  defp parse_resp_to_record_load(<<0, rest :: binary>>, acc) do
+    {Enum.reverse(acc), rest}
   end
 
   defp parse_resp_to_record_load(_, _acc) do
@@ -260,10 +279,10 @@ defmodule MarcoPolo.Protocol do
     ]
 
     case GP.parse(rest, parsers) do
-      {[record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
+      {[_record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
         {class_name, fields} = RecordSerialization.decode(record_content)
         record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
-        {{record_type(record_type), record}, rest}
+        {record, rest}
       :incomplete ->
         :incomplete
     end

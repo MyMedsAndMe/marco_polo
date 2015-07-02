@@ -36,7 +36,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
 
     {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
-    # {{class_name, fields}, rest}
   end
 
   defp decode_header(data, acc \\ []) do
@@ -271,6 +270,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp encode_field_for_header(name, ptr, value) do
     type = infer_type(value)
+
+    if is_atom(name) do
+      name = Atom.to_string(name)
+    end
+
     if is_nil(value) do
       ptr = 0
       type = :boolean

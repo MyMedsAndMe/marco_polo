@@ -36,6 +36,25 @@ defmodule MarcoPoloTest do
     assert is_integer(nrecords)
   end
 
+  test "create_record/3 and load_record/4" do
+    {:ok, c} = conn_db()
+    cluster_id = 13
+    record = %MarcoPolo.Record{class: "Propertyless", fields: %{"foo" => "bar"}}
+
+    {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
+
+    assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
+    assert is_integer(version)
+    assert version == 1
+
+    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
+
+    assert %MarcoPolo.Record{} = record
+    assert record.version == version
+    assert record.class == "Propertyless"
+    assert record.fields == %{"foo" => "bar"}
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server, user: user(), password: pass())
   end

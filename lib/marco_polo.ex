@@ -1,5 +1,7 @@
 defmodule MarcoPolo do
   alias MarcoPolo.Connection, as: C
+  alias MarcoPolo.RID
+  alias MarcoPolo.Record
 
   @default_opts [
     host: "localhost",
@@ -89,5 +91,70 @@ defmodule MarcoPolo do
   @spec db_countrecords(pid) :: {:ok, non_neg_integer}
   def db_countrecords(conn) do
     Connection.call(conn, {:operation, :db_countrecords, []})
+  end
+
+  @doc """
+  Creates a record in the database to which `conn` is connected.
+
+  `cluster_id` specifies the cluster to create the record in, while `record` is
+  the `MarcoPolo.Record` struct representing the record to create.
+
+  The return value in case of success is `{:ok, {rid, version}}` where `rid` is
+  the rid of the newly created record and `version` is the version of the newly
+  created record.
+
+  ## Examples
+
+      iex> record = %MarcoPolo.Record{class: "MyClass", fields: %{"foo" => "bar"}}
+      iex> MarcoPolo.create_record(conn, 15, record)
+      {:ok, {%MarcoPolo.RID{cluster_id: 15, position: 10}, 1}}
+
+  """
+  @spec create_record(pid, non_neg_integer, Record.t) ::
+    {:ok, {RID.t, non_neg_integer}}
+  def create_record(conn, cluster_id, record) do
+    args = [{:short, cluster_id}, record, {:raw, "d"}, {:raw, <<0>>}]
+
+    case Connection.call(conn, {:operation, :record_create, args}) do
+      {:ok, [cluster_id, position, version]} ->
+        rid = %RID{cluster_id: cluster_id, position: position}
+        {:ok, {rid, version}}
+      o ->
+        o
+    end
+  end
+
+  @doc """
+  Loads a record from the database to which `conn` is connected.
+
+  The record to load is identified by `rid`. `fetch_plan` is the [fetching
+  strategy](http://orientdb.com/docs/last/Fetching-Strategies.html) used to
+  fetch the record from the database. Since multiple records could be returned,
+  the return value is `{:ok, list_of_records}`.
+
+  This function accepts a list of options (`opts`):
+
+    * `:ignore_cache` - if `true`, the cache is ignored, if `false` it's not.
+      Defaults to `true`.
+    * `:load_tombstones` - if `true`, information about deleted records is
+      loaded, if `false` it's not. Defaults to `false`.
+
+  ## Examples
+
+      iex> rid = %MarcoPolo.RID{cluster_id: 10, position: 184}
+      iex> {:ok, [record]} = MarcoPolo.load_record(conn, rid, "*:-1")
+      iex> record.fields
+      %{"foo" => "bar"}
+
+  """
+  @spec load_record(pid, RID.t, String.t, Keyword.t) :: {:ok, [Record.t]}
+  def load_record(conn, %RID{} = rid, fetch_plan, opts \\ []) do
+    args = [{:short, rid.cluster_id},
+            {:long, rid.position},
+            fetch_plan,
+            opts[:ignore_cache] || true,
+            opts[:load_tombstones] || false]
+
+    Connection.call(conn, {:operation, :record_load, args})
   end
 end
