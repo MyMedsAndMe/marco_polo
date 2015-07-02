@@ -7,6 +7,21 @@ defmodule MarcoPolo do
   ]
 
   @doc """
+  Starts the connection with an OrientDB server.
+
+  This function accepts the following options:
+
+    * `:user` - (string) the OrientDB user. This option is **required**.
+    * `:pass` - (string) the OrientDB password. This option is **required**.
+    * `:connection` - specifies the connection type. To connect to the OrientDB
+      server (to perform server operations) this option must have the value
+      `:server`; to connect to a database, this option must have the value
+      `{:db, db_name, db_type}`.
+    * `:host` - (string) the host where the OrientDB server is running. Defaults
+      to `"localhost"`.
+    * `:port` - (integer) the port where the OrientDB server is
+      running. Defaults to `2424`.
+
   """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
