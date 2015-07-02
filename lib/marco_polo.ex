@@ -157,4 +157,28 @@ defmodule MarcoPolo do
 
     Connection.call(conn, {:operation, :record_load, args})
   end
+
+  @doc """
+  Deletes a record from the database to which `conn` is connected.
+
+  The record to delete is identified by `rid`; version `version` is
+  deleted. Returns `{:ok, deleted?}` where `deleted?` is a boolean that tells
+  whether the record has been deleted.
+
+  ## Examples
+
+      iex> rid = %MarcoPolo.RID{cluster_id: 76, position: 12}
+      iex> MarcoPolo.delete_record(conn, rid, 1)
+      {:ok, true}
+
+  """
+  @spec delete_record(pid, RID.t, non_neg_integer) :: {:ok, boolean}
+  def delete_record(conn, %RID{} = rid, version) do
+    args = [{:short, rid.cluster_id},
+            {:long, rid.position},
+            {:int, version},
+            {:raw, <<0>>}]
+
+    Connection.call(conn, {:operation, :record_delete, args})
+  end
 end

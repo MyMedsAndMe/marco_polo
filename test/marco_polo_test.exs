@@ -36,7 +36,7 @@ defmodule MarcoPoloTest do
     assert is_integer(nrecords)
   end
 
-  test "create_record/3 and load_record/4" do
+  test "create_record/3, load_record/4 and delete_record/1" do
     {:ok, c} = conn_db()
     cluster_id = 13
     record = %MarcoPolo.Record{class: "Propertyless", fields: %{"foo" => "bar"}}
@@ -45,7 +45,6 @@ defmodule MarcoPoloTest do
 
     assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
     assert is_integer(version)
-    assert version == 1
 
     {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
 
@@ -53,6 +52,12 @@ defmodule MarcoPoloTest do
     assert record.version == version
     assert record.class == "Propertyless"
     assert record.fields == %{"foo" => "bar"}
+
+    # Wrong version doesn't delete anything.
+    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 1)
+
+    assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
+    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
   end
 
   defp conn_server do
