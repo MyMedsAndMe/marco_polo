@@ -15,7 +15,7 @@ defmodule MarcoPoloTest do
 
   test "db_exists?/3" do
     {:ok, c} = conn_server()
-    assert {:ok, true}  = MarcoPolo.db_exists?(c, "GratefulDeadConcerts", "plocal")
+    assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTestDb", "plocal")
     assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
   end
 
@@ -38,8 +38,8 @@ defmodule MarcoPoloTest do
 
   test "create_record/3, load_record/4 and delete_record/1" do
     {:ok, c} = conn_db()
-    cluster_id = 13
-    record = %MarcoPolo.Record{class: "Propertyless", fields: %{"foo" => "bar"}}
+    cluster_id = TestHelpers.cluster_id()
+    record = %MarcoPolo.Record{class: "Schemaless", fields: %{"foo" => "bar"}}
 
     {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
 
@@ -50,7 +50,7 @@ defmodule MarcoPoloTest do
 
     assert %MarcoPolo.Record{} = record
     assert record.version == version
-    assert record.class == "Propertyless"
+    assert record.class == "Schemaless"
     assert record.fields == %{"foo" => "bar"}
 
     # Wrong version doesn't delete anything.
@@ -65,7 +65,7 @@ defmodule MarcoPoloTest do
   end
 
   defp conn_db do
-    MarcoPolo.start_link(connection: {:db, "GratefulDeadConcerts", "plocal"},
+    MarcoPolo.start_link(connection: {:db, "MarcoPoloTestDb", "plocal"},
                          user: user(),
                          password: pass())
   end
