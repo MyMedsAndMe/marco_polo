@@ -32,7 +32,7 @@ end
 output = run_script.("""
 SET ignoreErrors true;
 DROP DATABASE #{db_url} root root;
-DROP DATABASE remote:localhost/TestGeneratedDb root root;
+DROP DATABASE remote:localhost/MarcoPoloTestGeneratedDb root root;
 SET ignoreErrors false;
 
 CREATE DATABASE #{db_url} root root plocal;

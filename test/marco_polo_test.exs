@@ -23,7 +23,7 @@ defmodule MarcoPoloTest do
 
   test "create_db/4" do
     {:ok, c} = conn_server()
-    assert :ok = MarcoPolo.create_db(c, "TestGeneratedDb", :document, :plocal)
+    assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGeneratedDb", :document, :plocal)
   end
 
   test "db_reload/1" do
