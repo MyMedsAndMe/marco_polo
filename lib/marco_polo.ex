@@ -93,6 +93,26 @@ defmodule MarcoPolo do
   end
 
   @doc """
+  Drop a database on the server.
+
+  This function drops the database identified by the name `name` and the storage
+  type `type` (either `:plocal` or `:memory`).
+
+  ## Examples
+
+      iex> MarcoPolo.drop_db(conn, "UselessDatabase", :memory)
+      :ok
+
+  """
+  @spec drop_db(pid, String.t, :plocal | :memory) :: :ok
+  def drop_db(conn, name, storage) when storage in [:plocal, :memory] do
+    case C.operation(conn, :db_drop, [name, Atom.to_string(storage)]) do
+      {:ok, nil} -> :ok
+      o          -> o
+    end
+  end
+
+  @doc """
   Returns the size of the database to which `conn` is connected.
 
   ## Examples

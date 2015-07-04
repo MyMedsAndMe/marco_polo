@@ -33,9 +33,11 @@ output = run_script.("""
 SET ignoreErrors true;
 DROP DATABASE #{db_url} root root;
 DROP DATABASE remote:localhost/MarcoPoloTestGeneratedDb root root;
+DROP DATABASE remote:localhost/MarcoPoloToDrop root root;
 SET ignoreErrors false;
 
 CREATE DATABASE #{db_url} root root plocal;
+CREATE DATABASE remote:localhost/MarcoPoloToDrop root root memory;
 
 CONNECT #{db_url} admin admin;
 
