@@ -2,6 +2,7 @@ defmodule MarcoPolo do
   alias MarcoPolo.Connection, as: C
   alias MarcoPolo.RID
   alias MarcoPolo.Record
+  alias MarcoPolo.Protocol
 
   @default_opts [
     host: "localhost",
@@ -180,5 +181,47 @@ defmodule MarcoPolo do
             {:raw, <<0>>}]
 
     Connection.call(conn, {:operation, :record_delete, args})
+  end
+
+  @doc """
+  Execute the given `query` in the database to which `conn` is connected.
+
+  `opts` is a list of options that depend on the kind of command being issued.
+
+  If `query` is an *idempotent* command (`SELECT`), then the options are:
+
+    * `:fetch_plan`: a string specifying the fetch plan. Mandatory for `SELECT`
+      queries.
+
+  """
+  @spec command(pid, String.t, Keyword.t) :: term
+  def command(conn, query, opts) do
+    query_type = MarcoPolo.QueryParser.query_type(query)
+
+    command_class_name =
+      case query_type do
+        :sql_query   -> "q"
+        :sql_command -> "s"
+      end
+
+    command_class_name = Protocol.encode_term(command_class_name)
+
+    payload = encode_query_with_type(query_type, query, opts)
+
+    args = [{:raw, "s"}, # synchronous mode
+            IO.iodata_length([command_class_name, payload]),
+            {:raw, command_class_name},
+            {:raw, payload}]
+
+    Connection.call(conn, {:operation, :command, args})
+  end
+
+  defp encode_query_with_type(:sql_query, query, opts) do
+    args = [query,
+            -1,
+            Keyword.fetch!(opts, :fetch_plan),
+            %Record{class: nil, fields: %{"params" => %{}}}]
+
+    Enum.map(args, &Protocol.encode_term/1)
   end
 end

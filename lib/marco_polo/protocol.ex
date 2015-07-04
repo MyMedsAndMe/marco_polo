@@ -280,8 +280,8 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(rest, parsers) do
       {[_record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
-        {class_name, fields} = RecordSerialization.decode(record_content)
-        record = %MarcoPolo.Record{class: class_name, fields: fields, version: version}
+        {record, <<>>} = RecordSerialization.decode(record_content)
+        record = %{record | version: version}
         {record, rest}
       :incomplete ->
         :incomplete

@@ -73,6 +73,18 @@ defmodule MarcoPoloTest do
     assert is_integer(version)
   end
 
+  test "command/3: SELECT query" do
+    {:ok, c}       = conn_db()
+    {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
+
+    assert Enum.find(records, fn record ->
+      assert %MarcoPolo.Record{} = record
+      assert record.class == "Schemaless"
+
+      record.fields["name"] == "record_load"
+    end)
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server,
                          user: TestHelpers.user(),
