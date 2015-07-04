@@ -185,6 +185,10 @@ defmodule MarcoPolo do
       Defaults to `true`.
     * `:load_tombstones` - if `true`, information about deleted records is
       loaded, if `false` it's not. Defaults to `false`.
+    * `:if_version_not_latest` - if `true`, only load the given record if the
+      version specified in the `:version` option is not the latest. If this
+      option is present, the `:version` option is required. This functionality
+      is supported in OrientDB >= 2.1.
 
   ## Examples
 
@@ -196,13 +200,26 @@ defmodule MarcoPolo do
   """
   @spec load_record(pid, RID.t, String.t, Keyword.t) :: {:ok, [Record.t]}
   def load_record(conn, %RID{} = rid, fetch_plan, opts \\ []) do
-    args = [{:short, rid.cluster_id},
-            {:long, rid.position},
-            fetch_plan,
-            opts[:ignore_cache] || true,
-            opts[:load_tombstones] || false]
+    {op, args} =
+      if opts[:if_version_not_latest] do
+        args = [{:short, rid.cluster_id},
+                {:long, rid.position},
+                {:int, Keyword.fetch!(opts, :version)},
+                fetch_plan,
+                opts[:ignore_cache] || true,
+                opts[:load_tombstones] || false]
+        {:record_load_if_version_not_latest, args}
+      else
+        args = [{:short, rid.cluster_id},
+                {:long, rid.position},
+                fetch_plan,
+                opts[:ignore_cache] || true,
+                opts[:load_tombstones] || false]
+        {:record_load, args}
+      end
 
-    C.operation(conn, :record_load, args)
+
+    C.operation(conn, op, args)
   end
 
   @doc """

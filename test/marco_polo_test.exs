@@ -60,6 +60,13 @@ defmodule MarcoPoloTest do
     assert record.fields  == %{"name" => "record_load"}
   end
 
+  test "load_record/4 using the :if_version_not_latest option" do
+    {:ok, c} = conn_db()
+    rid      = TestHelpers.record_rid("record_load")
+
+    assert {:ok, []} = MarcoPolo.load_record(c, rid, "*:-1", version: 1, if_version_not_latest: true)
+  end
+
   test "delete_record/3" do
     {:ok, c} = conn_db()
     version  = 1
