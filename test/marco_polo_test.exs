@@ -1,6 +1,8 @@
 defmodule MarcoPoloTest do
   use ExUnit.Case, async: true
 
+  @db_name TestHelpers.db_name()
+
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
     assert_raise ArgumentError, msg, fn ->
@@ -15,7 +17,7 @@ defmodule MarcoPoloTest do
 
   test "db_exists?/3" do
     {:ok, c} = conn_server()
-    assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTestDb", "plocal")
+    assert {:ok, true}  = MarcoPolo.db_exists?(c, TestHelpers.db_name(), "plocal")
     assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
   end
 
@@ -36,7 +38,31 @@ defmodule MarcoPoloTest do
     assert is_integer(nrecords)
   end
 
-  test "create_record/3, load_record/4 and delete_record/1" do
+  test "load_record/4" do
+    {:ok, c} = conn_db()
+    rid      = TestHelpers.record_rid("record_load")
+
+    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
+
+    assert %MarcoPolo.Record{} = record
+    assert record.version == 1
+    assert record.class   == "Schemaless"
+    assert record.fields  == %{"name" => "record_load"}
+  end
+
+  test "delete_record/3" do
+    {:ok, c} = conn_db()
+    version  = 1
+    rid      = TestHelpers.record_rid("record_delete")
+
+    # Wrong version causes no deletions.
+    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 100)
+
+    assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
+    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
+  end
+
+  test "create_record/3" do
     {:ok, c} = conn_db()
     cluster_id = TestHelpers.cluster_id()
     record = %MarcoPolo.Record{class: "Schemaless", fields: %{"foo" => "bar"}}
@@ -45,31 +71,17 @@ defmodule MarcoPoloTest do
 
     assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
     assert is_integer(version)
-
-    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
-
-    assert %MarcoPolo.Record{} = record
-    assert record.version == version
-    assert record.class == "Schemaless"
-    assert record.fields == %{"foo" => "bar"}
-
-    # Wrong version doesn't delete anything.
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 1)
-
-    assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
   end
 
   defp conn_server do
-    MarcoPolo.start_link(connection: :server, user: user(), password: pass())
+    MarcoPolo.start_link(connection: :server,
+                         user: TestHelpers.user(),
+                         password: TestHelpers.password())
   end
 
   defp conn_db do
-    MarcoPolo.start_link(connection: {:db, "MarcoPoloTestDb", "plocal"},
-                         user: user(),
-                         password: pass())
+    MarcoPolo.start_link(connection: {:db, TestHelpers.db_name(), "plocal"},
+                         user: TestHelpers.user(),
+                         password: TestHelpers.password())
   end
-
-  defp user, do: System.get_env("ORIENTDB_USER")
-  defp pass, do: System.get_env("ORIENTDB_PASS")
 end
