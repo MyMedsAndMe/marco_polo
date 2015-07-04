@@ -222,7 +222,7 @@ defmodule MarcoPolo.Protocol do
     ]
 
     case GP.parse(rest, parsers) do
-      {[type, version, record_content], rest} ->
+      {[_type, version, record_content], rest} ->
         {record, <<>>} = RecordSerialization.decode(record_content)
         record = %{record | version: version}
         parse_resp_to_record_load(rest, [record|acc])
@@ -299,8 +299,6 @@ defmodule MarcoPolo.Protocol do
   defp parse_record_with_rid(_) do
     :incomplete
   end
-
-  defp record_type(?d), do: :document
 
   defp req_code(:shutdown),                        do: 1
   defp req_code(:connect),                         do: 2
