@@ -7,7 +7,7 @@ defmodule MarcoPolo.Connection do
   alias MarcoPolo.Error
   import MarcoPolo.Protocol.BinaryHelpers
 
-  @protocol 28
+  @protocol 30
 
   @connection_args [
     "OrientDB binary driver for Elixir",
