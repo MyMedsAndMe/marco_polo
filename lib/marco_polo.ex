@@ -28,11 +28,13 @@ defmodule MarcoPolo do
   """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
+    opts = Keyword.merge(@default_opts, opts)
+
     unless Keyword.get(opts, :connection) do
       raise ArgumentError, "no connection type (connect/db_open) specified"
     end
 
-    Connection.start_link(C, Keyword.merge(@default_opts, opts))
+    C.start_link(opts)
   end
 
   @doc """
@@ -46,7 +48,7 @@ defmodule MarcoPolo do
   """
   @spec db_exists?(pid, String.t, String.t) :: {:ok, boolean}
   def db_exists?(conn, name, type) do
-    Connection.call(conn, {:operation, :db_exist, [name, type]})
+    C.operation(conn, :db_exist, [name, type])
   end
 
   @doc """
@@ -60,7 +62,7 @@ defmodule MarcoPolo do
   """
   @spec db_reload(pid) :: :ok
   def db_reload(conn) do
-    case Connection.call(conn, {:operation, :db_reload, []}) do
+    case C.operation(conn, :db_reload, []) do
       {:ok, _}            -> :ok
       {:error, _} = error -> error
     end
@@ -77,7 +79,7 @@ defmodule MarcoPolo do
   """
   @spec db_size(pid) :: {:ok, non_neg_integer}
   def db_size(conn) do
-    Connection.call(conn, {:operation, :db_size, []})
+    C.operation(conn, :db_size, [])
   end
 
   @doc """
@@ -91,7 +93,7 @@ defmodule MarcoPolo do
   """
   @spec db_countrecords(pid) :: {:ok, non_neg_integer}
   def db_countrecords(conn) do
-    Connection.call(conn, {:operation, :db_countrecords, []})
+    C.operation(conn, :db_countrecords, [])
   end
 
   @doc """
@@ -116,7 +118,7 @@ defmodule MarcoPolo do
   def create_record(conn, cluster_id, record) do
     args = [{:short, cluster_id}, record, {:raw, "d"}, {:raw, <<0>>}]
 
-    case Connection.call(conn, {:operation, :record_create, args}) do
+    case C.operation(conn, :record_create, args) do
       {:ok, [cluster_id, position, version]} ->
         rid = %RID{cluster_id: cluster_id, position: position}
         {:ok, {rid, version}}
@@ -156,7 +158,7 @@ defmodule MarcoPolo do
             opts[:ignore_cache] || true,
             opts[:load_tombstones] || false]
 
-    Connection.call(conn, {:operation, :record_load, args})
+    C.operation(conn, :record_load, args)
   end
 
   @doc """
@@ -180,7 +182,7 @@ defmodule MarcoPolo do
             {:int, version},
             {:raw, <<0>>}]
 
-    Connection.call(conn, {:operation, :record_delete, args})
+    C.operation(conn, :record_delete, args)
   end
 
   @doc """
@@ -213,7 +215,7 @@ defmodule MarcoPolo do
             {:raw, command_class_name},
             {:raw, payload}]
 
-    Connection.call(conn, {:operation, :command, args})
+    C.operation(conn, :command, args)
   end
 
   defp encode_query_with_type(:sql_query, query, opts) do

@@ -26,6 +26,10 @@ defmodule MarcoPolo.Connection do
 
   ## Client code.
 
+  def start_link(opts) do
+    Connection.start_link(__MODULE__, opts)
+  end
+
   def operation(pid, op_name, args) do
     Connection.call(pid, {:operation, op_name, args})
   end
