@@ -28,7 +28,8 @@ defmodule MarcoPolo.Mixfile do
   defp deps do
     [{:decimal, "~> 1.1.0"},
      {:connection, github: "fishcakez/connection"},
-     {:small_ints, github: "whatyouhide/small_ints"}]
+     {:small_ints, github: "whatyouhide/small_ints"},
+     {:ex_doc, "~> 0.7", only: :docs}]
   end
 
   # This beauty is taken almost verbatim from the mix.exs file of the Ecto
