@@ -21,6 +21,11 @@ defmodule MarcoPoloTest do
     assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
   end
 
+  test "create_db/4" do
+    {:ok, c} = conn_server()
+    assert :ok = MarcoPolo.create_db(c, "TestGeneratedDb", :document, :plocal)
+  end
+
   test "db_reload/1" do
     {:ok, c} = conn_db()
     assert :ok = MarcoPolo.db_reload(c)

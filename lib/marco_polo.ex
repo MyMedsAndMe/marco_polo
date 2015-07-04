@@ -69,6 +69,30 @@ defmodule MarcoPolo do
   end
 
   @doc """
+  Creates a database on the server.
+
+  `name` is used as the database name, `type` as the database type (`:document`
+  or `:graph`) and `storage` as the storage type (`:plocal` or `:memory`).
+
+  ## Examples
+
+      iex> MarcoPolo.create_db(conn, "MyCoolDatabase", :document, :plocal)
+      :ok
+
+  """
+  @spec create_db(pid, String.t, :document | :graph, :plocal | :memory) :: :ok
+  def create_db(conn, name, type, storage)
+      when type in [:document, :graph] and storage in [:plocal, :memory] do
+    type    = Atom.to_string(type)
+    storage = Atom.to_string(storage)
+
+    case C.operation(conn, :db_create, [name, type, storage]) do
+      {:ok, nil} -> :ok
+      o          -> o
+    end
+  end
+
+  @doc """
   Returns the size of the database to which `conn` is connected.
 
   ## Examples
