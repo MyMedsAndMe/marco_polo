@@ -206,6 +206,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Decimal.new(value), rest}
   end
 
+  # TODO: decoding of the LinkBag type, which has... no docs :D
+
   defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
 
@@ -389,6 +391,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     [:small_ints.encode_zigzag_varint(map_size(rid_map)), keys_and_values]
   end
+
+  # TODO: encoding of the LinkBag type which isn't documented *at all*! Yay!
 
   defp map_header_offset(map) do
     keys = Map.keys(map)
