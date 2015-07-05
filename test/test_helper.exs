@@ -48,11 +48,23 @@ CREATE CLASS Schemaless CLUSTER schemaless;
 %{"id" => cluster_id} =
   Regex.named_captures(~r/Cluster created correctly with id #(?<id>\d+)/, output)
 
+output = run_script.("""
+CONNECT #{db_url} admin admin;
+CREATE CLUSTER schemaful;
+CREATE CLASS Schemaful;
+
+CREATE PROPERTY Schemaful.myString STRING;
+""")
+
+%{"id" => schemaful_cluster_id} =
+  Regex.named_captures(~r/Cluster created correctly with id #(?<id>\d+)/, output)
+
 # Insert some records
 records = [
   insert_record.("record_delete", "INSERT INTO Schemaless(name) VALUES ('record_delete');"),
   insert_record.("record_update", "INSERT INTO Schemaless(name, f) VALUES ('record_update', 'foo');"),
-  insert_record.("record_load", "INSERT INTO Schemaless(name) VALUES ('record_load');")
+  insert_record.("record_load", "INSERT INTO Schemaless(name) VALUES ('record_load');"),
+  insert_record.("schemaless_record_load", "INSERT INTO Schemaful(myString) VALUES ('record_load');"),
 ]
 
 
@@ -60,6 +72,7 @@ defmodule TestHelpers do
   def db_name, do: unquote(db_name)
 
   def cluster_id, do: unquote(String.to_integer(cluster_id))
+  def schemaful_cluster_id, do: unquote(String.to_integer(schemaful_cluster_id))
 
   def user,     do: System.get_env("ORIENTDB_USER")
   def password, do: System.get_env("ORIENTDB_PASS")
