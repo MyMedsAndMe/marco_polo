@@ -163,6 +163,18 @@ defmodule MarcoPoloTest do
     assert {:ok, "1"} = MarcoPolo.command(c, cmd, params: params)
   end
 
+  test "command/3: miscellaneous commands" do
+    import MarcoPolo, only: [command: 2, command: 3]
+
+    {:ok, c} = conn_db()
+
+    assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
+    assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+    assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
+    assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
+    assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server,
                          user: TestHelpers.user(),
