@@ -100,7 +100,7 @@ defmodule MarcoPolo.Connection do
       :incomplete ->
         %{s | tail: data}
       {:error, %Error{} = error, rest} ->
-        Connection.reply(from, error)
+        Connection.reply(from, {:error, error})
         s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
       {:ok, ^sid, resp, rest} ->
         Connection.reply(from, {:ok, resp})
