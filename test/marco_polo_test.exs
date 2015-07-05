@@ -144,6 +144,15 @@ defmodule MarcoPoloTest do
     assert record.fields["name"] == "record_load"
   end
 
+  test "command/3: INSERT query inserting multiple records" do
+    {:ok, c} = conn_db()
+    cmd = "INSERT INTO Schemaless(my_field) VALUES ('value1'), ('value2')"
+
+    assert {:ok, [r1, r2]} = MarcoPolo.command(c, cmd)
+    assert r1.fields["my_field"] == "value1"
+    assert r2.fields["my_field"] == "value2"
+  end
+
   test "command/3: UPDATE query with parameters" do
     {:ok, c} = conn_db()
     cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
