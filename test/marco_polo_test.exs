@@ -71,7 +71,8 @@ defmodule MarcoPoloTest do
 
   test "load_record/4" do
     {:ok, c} = conn_db()
-    rid      = TestHelpers.record_rid("record_load")
+
+    rid = TestHelpers.record_rid("record_load")
 
     {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
 
@@ -79,6 +80,13 @@ defmodule MarcoPoloTest do
     assert record.version == 1
     assert record.class   == "Schemaless"
     assert record.fields  == %{"name" => "record_load"}
+
+    rid = TestHelpers.record_rid("schemaless_record_load")
+
+    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
+    assert record.version == 1
+    assert record.class == "Schemaful"
+    assert record.fields == %{"myString" => "record_load"}
   end
 
   test "load_record/4 using the :if_version_not_latest option" do
@@ -170,6 +178,7 @@ defmodule MarcoPoloTest do
 
     assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
     assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+    assert {:ok, _unknown} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
     assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
     assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
     assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
