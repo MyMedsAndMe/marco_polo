@@ -264,7 +264,7 @@ defmodule MarcoPolo do
     command_class_name =
       case query_type do
         :sql_query   -> "q"
-        :sql_command -> "s"
+        :sql_command -> "c"
       end
 
     command_class_name = Protocol.encode_term(command_class_name)
@@ -286,6 +286,21 @@ defmodule MarcoPolo do
             Keyword.fetch!(opts, :fetch_plan),
             %Record{class: nil, fields: %{"params" => params}}]
 
+    Enum.map(args, &Protocol.encode_term/1)
+  end
+
+  defp encode_query_with_type(:sql_command, query, opts) do
+    args = [query]
+
+    if params = opts[:params] do
+      params = %Record{class: nil, fields: %{"parameters" => params}}
+      # `true` means "use simple parameters".
+      args = args ++ [true, params]
+    else
+      args = args ++ [false]
+    end
+
+    args = args ++ [false]
     Enum.map(args, &Protocol.encode_term/1)
   end
 end

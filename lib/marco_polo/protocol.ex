@@ -260,6 +260,15 @@ defmodule MarcoPolo.Protocol do
     record
   end
 
+  defp parse_resp_to_command(<<@serialized_result, rest :: binary>>) do
+    case GP.parse(rest, [&parse(&1, :bytes), &parse(&1, :byte)]) do
+      # TODO find out why OrientDB shoves a 0 byte at the end of this binary
+      # dump, not mentioned in the docs :(
+      {[binary, 0], rest} -> {binary, rest}
+      _                   -> :incomplete
+    end
+  end
+
   defp parse_resp_to_command(_) do
     :incomplete
   end

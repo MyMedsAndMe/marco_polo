@@ -144,6 +144,16 @@ defmodule MarcoPoloTest do
     assert record.fields["name"] == "record_load"
   end
 
+  test "command/3: UPDATE query with parameters" do
+    {:ok, c} = conn_db()
+    cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
+    params = %{"name" => "record_update", "f" => "new_value"}
+
+    # TODO the response is a binary dump with "1" in it, not sure what that
+    # means.
+    assert {:ok, "1"} = MarcoPolo.command(c, cmd, params: params)
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server,
                          user: TestHelpers.user(),
