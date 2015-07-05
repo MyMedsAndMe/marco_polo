@@ -280,10 +280,11 @@ defmodule MarcoPolo do
   end
 
   defp encode_query_with_type(:sql_query, query, opts) do
+    params = opts[:params] || %{}
     args = [query,
             -1,
             Keyword.fetch!(opts, :fetch_plan),
-            %Record{class: nil, fields: %{"params" => %{}}}]
+            %Record{class: nil, fields: %{"params" => params}}]
 
     Enum.map(args, &Protocol.encode_term/1)
   end

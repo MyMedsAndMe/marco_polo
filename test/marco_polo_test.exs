@@ -133,6 +133,17 @@ defmodule MarcoPoloTest do
     assert record.fields["name"] == "record_load"
   end
 
+  test "command/3: SELECT query with a WHERE clause and parameters" do
+    {:ok, c} = conn_db()
+
+    cmd    = "SELECT FROM Schemaless WHERE name = :name"
+    params = %{"name" => "record_load"}
+    res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
+
+    assert {:ok, [%MarcoPolo.Record{} = record]} = res
+    assert record.fields["name"] == "record_load"
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server,
                          user: TestHelpers.user(),
