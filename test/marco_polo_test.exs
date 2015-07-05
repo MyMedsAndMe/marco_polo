@@ -1,6 +1,8 @@
 defmodule MarcoPoloTest do
   use ExUnit.Case, async: true
 
+  alias MarcoPolo.Error
+
   @db_name TestHelpers.db_name()
 
   test "start_link/1: not specifying a connection type raises an error" do
@@ -21,14 +23,33 @@ defmodule MarcoPoloTest do
     assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
   end
 
-  test "create_db/4" do
+  test "create_db/4 with a database that doens't exist yet" do
     {:ok, c} = conn_server()
     assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGeneratedDb", :document, :plocal)
   end
 
-  test "drop_db/3" do
+  test "create_db/4 with a database that already exists" do
+    {:ok, c} = conn_server()
+
+    assert {:error, %Error{} = err} = MarcoPolo.create_db(c, TestHelpers.db_name, :document, :plocal)
+    assert [{exception, msg}] = err.errors
+    assert exception == "com.orientechnologies.orient.core.exception.ODatabaseException"
+    assert msg       =~ "Database named 'MarcoPoloTestDb' already exists:"
+  end
+
+  test "drop_db/3 with an existing database" do
     {:ok, c} = conn_server()
     assert :ok = MarcoPolo.drop_db(c, "MarcoPoloToDrop", :memory)
+  end
+
+  test "drop_db/3 with a non-existing database" do
+    {:ok, c} = conn_server()
+
+    expected = {"com.orientechnologies.orient.core.exception.OStorageException",
+                "Database with name 'Nonexistent' doesn't exits."}
+
+    assert {:error, %MarcoPolo.Error{} = err} = MarcoPolo.drop_db(c, "Nonexistent", :plocal)
+    assert hd(err.errors) == expected
   end
 
   test "db_reload/1" do
@@ -90,7 +111,7 @@ defmodule MarcoPoloTest do
     assert is_integer(version)
   end
 
-  test "command/3: SELECT query" do
+  test "command/3: SELECT query without a WHERE clause" do
     {:ok, c}       = conn_db()
     {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
 
@@ -100,6 +121,16 @@ defmodule MarcoPoloTest do
 
       record.fields["name"] == "record_load"
     end)
+  end
+
+  test "command/3: SELECT query with a WHERE clause" do
+    {:ok, c} = conn_db()
+
+    cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
+    res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
+
+    assert {:ok, [%MarcoPolo.Record{} = record]} = res
+    assert record.fields["name"] == "record_load"
   end
 
   defp conn_server do
