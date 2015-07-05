@@ -4,6 +4,7 @@ defmodule MarcoPolo.Connection do
   require Logger
 
   alias MarcoPolo.Protocol
+  alias MarcoPolo.Record
   alias MarcoPolo.Error
   import MarcoPolo.Protocol.BinaryHelpers
 
@@ -22,12 +23,23 @@ defmodule MarcoPolo.Connection do
   @initial_state %{socket: nil,
                    session_id: nil,
                    queue: :queue.new,
+                   schema: nil,
                    tail: ""}
 
   ## Client code.
 
   def start_link(opts) do
-    Connection.start_link(__MODULE__, opts)
+    case Connection.start_link(__MODULE__, opts) do
+      {:error, _} = err ->
+        err
+      {:ok, pid} = res ->
+        case Keyword.fetch!(opts, :connection) do
+          {:db, _, _} -> Connection.cast(pid, :fetch_schema)
+          _           -> nil
+        end
+
+        res
+    end
   end
 
   def operation(pid, op_name, args) do
@@ -86,26 +98,47 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def handle_cast(:fetch_schema, %{session_id: sid} = s) do
+    args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
+    req = Protocol.encode_op(:record_load, args)
+
+    s = update_in(s.queue, &:queue.in(:fetch_schema, &1))
+
+    :gen_tcp.send(s.socket, req)
+    {:noreply, s}
+  end
+
+  @doc false
   def handle_info(msg, state)
 
   def handle_info({:tcp, socket, msg}, %{session_id: sid, socket: socket} = s) do
     # Reactivate the socket.
     :inet.setopts(socket, active: :once)
-
-    {{:value, {from, op_name}}, new_queue} = :queue.out(s.queue)
-
     data = s.tail <> msg
 
-    s = case Protocol.parse_resp(op_name, data) do
-      :incomplete ->
-        %{s | tail: data}
-      {:error, %Error{} = error, rest} ->
-        Connection.reply(from, {:error, error})
-        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
-      {:ok, ^sid, resp, rest} ->
-        Connection.reply(from, {:ok, resp})
-        s |> Map.put(:tail, rest) |> Map.put(:queue, new_queue)
-    end
+    s =
+      case :queue.out(s.queue) do
+        {{:value, :fetch_schema}, new_queue} ->
+          case Protocol.parse_resp(:record_load, data, %{global_properties: %{}}) do
+            :incomplete ->
+              %{s | tail: data}
+            {:error, %Error{}, _} ->
+              raise "couldn't fetch schema"
+            {:ok, ^sid, [resp], rest} ->
+              %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
+          end
+        {{:value, {from, op_name}}, new_queue} ->
+          case Protocol.parse_resp(op_name, data, get_in(s, [:schema, :global_properties])) do
+            :incomplete ->
+              %{s | tail: data}
+            {:error, %Error{} = error, rest} ->
+              Connection.reply(from, {:error, error})
+              %{s | tail: rest, queue: new_queue}
+            {:ok, ^sid, resp, rest} ->
+              Connection.reply(from, {:ok, resp})
+              %{s | tail: rest, queue: new_queue}
+          end
+      end
 
     {:noreply, s}
   end
@@ -194,5 +227,15 @@ defmodule MarcoPolo.Connection do
     else
       %Error{message: "unsupported protocol version, the supported version is >= #{supported}"}
     end
+  end
+
+  defp parse_schema(%Record{fields: %{"globalProperties" => properties}}) do
+    global_properties =
+      for %Record{fields: %{"name" => name, "type" => type, "id" => id}} <- properties,
+        into: HashDict.new() do
+          {id, {name, type}}
+      end
+
+    %{global_properties: global_properties}
   end
 end
