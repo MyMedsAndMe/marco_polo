@@ -3,8 +3,6 @@ defmodule MarcoPoloTest do
 
   alias MarcoPolo.Error
 
-  @db_name TestHelpers.db_name()
-
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
     assert_raise ArgumentError, msg, fn ->
@@ -19,22 +17,22 @@ defmodule MarcoPoloTest do
 
   test "db_exists?/3" do
     {:ok, c} = conn_server()
-    assert {:ok, true}  = MarcoPolo.db_exists?(c, TestHelpers.db_name(), "plocal")
+    assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", "plocal")
     assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
   end
 
   test "create_db/4 with a database that doens't exist yet" do
     {:ok, c} = conn_server()
-    assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGeneratedDb", :document, :plocal)
+    assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGenerated", :document, :plocal)
   end
 
   test "create_db/4 with a database that already exists" do
     {:ok, c} = conn_server()
 
-    assert {:error, %Error{} = err} = MarcoPolo.create_db(c, TestHelpers.db_name, :document, :plocal)
+    assert {:error, %Error{} = err} = MarcoPolo.create_db(c, "MarcoPoloTest", :document, :plocal)
     assert [{exception, msg}] = err.errors
     assert exception == "com.orientechnologies.orient.core.exception.ODatabaseException"
-    assert msg       =~ "Database named 'MarcoPoloTestDb' already exists:"
+    assert msg       =~ "Database named 'MarcoPoloTest' already exists:"
   end
 
   test "drop_db/3 with an existing database" do
@@ -110,7 +108,7 @@ defmodule MarcoPoloTest do
 
   test "create_record/3" do
     {:ok, c} = conn_db()
-    cluster_id = TestHelpers.cluster_id()
+    cluster_id = TestHelpers.cluster_id("schemaless")
     record = %MarcoPolo.Record{class: "Schemaless", fields: %{"foo" => "bar"}}
 
     {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
@@ -191,7 +189,7 @@ defmodule MarcoPoloTest do
   end
 
   defp conn_db do
-    MarcoPolo.start_link(connection: {:db, TestHelpers.db_name(), "plocal"},
+    MarcoPolo.start_link(connection: {:db, "MarcoPoloTest", "plocal"},
                          user: TestHelpers.user(),
                          password: TestHelpers.password())
   end
