@@ -258,7 +258,7 @@ defmodule MarcoPolo do
 
   """
   @spec command(pid, String.t, Keyword.t) :: term
-  def command(conn, query, opts) do
+  def command(conn, query, opts \\ []) do
     query_type = MarcoPolo.QueryParser.query_type(query)
 
     command_class_name =
