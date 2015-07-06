@@ -29,7 +29,11 @@ defmodule MarcoPolo.Protocol do
   @error <<1>>
 
   def encode_op(op_name, args) do
-    [req_code(op_name)|Enum.map(args, &encode_term/1)]
+    [req_code(op_name), encode_list_of_terms(args)]
+  end
+
+  def encode_list_of_terms(list) when is_list(list) do
+    Enum.map list, &encode_term/1
   end
 
   def encode_term(term)

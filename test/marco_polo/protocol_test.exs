@@ -49,4 +49,10 @@ defmodule MarcoPolo.ProtocolTest do
   test "encode_term/1: iolists" do
     assert IO.iodata_to_binary(Protocol.encode_term([?f, [?o, "o"]])) == <<3 :: int, "foo">>
   end
+
+  test "encode_list_of_terms/1" do
+    terms    = [{:short, 3}, {:raw, <<1>>}, "foo", false]
+    expected = <<3 :: 16, 1, 3 :: 32, "foo", 0>>
+    assert IO.iodata_to_binary(Protocol.encode_list_of_terms(terms)) == expected
+  end
 end

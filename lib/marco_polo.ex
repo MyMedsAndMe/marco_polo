@@ -286,7 +286,7 @@ defmodule MarcoPolo do
             Keyword.fetch!(opts, :fetch_plan),
             %Record{class: nil, fields: %{"params" => params}}]
 
-    Enum.map(args, &Protocol.encode_term/1)
+    Protocol.encode_list_of_terms(args)
   end
 
   defp encode_query_with_type(:sql_command, query, opts) do
@@ -301,6 +301,7 @@ defmodule MarcoPolo do
     end
 
     args = args ++ [false]
-    Enum.map(args, &Protocol.encode_term/1)
+
+    Protocol.encode_list_of_terms(args)
   end
 end
