@@ -67,9 +67,9 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_embedded/2: record with properties" do
-    record     = %Record{class: "foo", fields: %{"prop" => "value"}}
-    properties = %{0 => {"prop", "STRING"}}
-    assert Ser.decode(@record_with_property, properties) == {record, "rest"}
+    record = %Record{class: "foo", fields: %{"prop" => "value"}}
+    schema = %{global_properties: %{0 => {"prop", "STRING"}}}
+    assert Ser.decode(@record_with_property, schema) == {record, "rest"}
   end
 
   test "decode_type/2: simple types" do

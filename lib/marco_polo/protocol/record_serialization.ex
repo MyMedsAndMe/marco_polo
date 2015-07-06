@@ -12,9 +12,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   Parses a binary-serialized record.
   """
   @spec decode(binary, Dict.t) :: {non_neg_integer, String.t, %{}}
-  def decode(data, global_properties \\ HashDict.new) do
+  def decode(data, schema \\ HashDict.new) do
     <<_version, rest :: binary>> = data
-    decode_embedded(rest, global_properties)
+    decode_embedded(rest, schema)
   end
 
   @doc """
@@ -26,9 +26,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Decodes a document (ODocument). This ODocument can be a "top-level" document
   # or an "embedded" type, since the leading serialization version byte is not
   # decoded here (but in `decode/1`).
-  defp decode_embedded(data, global_properties) do
+  defp decode_embedded(data, schema) do
     {class_name, rest}        = decode_type(data, :string)
-    {field_definitions, rest} = decode_header(rest, global_properties)
+    {field_definitions, rest} = decode_header(rest, schema)
     {fields, rest}            = decode_fields(rest, field_definitions)
 
     if class_name == "" do
@@ -38,7 +38,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
   end
 
-  defp decode_header(data, global_properties, acc \\ []) do
+  defp decode_header(data, schema, acc \\ []) do
     {i, rest} = :small_ints.decode_zigzag_varint(data)
 
     # If `i` is positive, that means the next field definition is a "named
@@ -52,17 +52,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
         # want to ditch that byte.
         {Enum.reverse(acc), rest}
       i < 0 ->
-        {field, rest} = decode_property_definition(rest, i, global_properties)
-        decode_header(rest, global_properties, [field|acc])
+        {field, rest} = decode_property_definition(rest, i, schema)
+        decode_header(rest, schema, [field|acc])
       i > 0 ->
         {field, rest} = decode_field_definition(:named_field, data)
-        decode_header(rest, global_properties, [field|acc])
+        decode_header(rest, schema, [field|acc])
     end
   end
 
-  def decode_property_definition(data, encoded_id, global_properties) do
+  def decode_property_definition(data, encoded_id, schema) do
     id = (encoded_id * -1) - 1
-    {name, stringified_type} = Dict.get(global_properties, id)
+    {name, stringified_type} = Dict.fetch!(schema.global_properties, id)
     {data_ptr, rest} = decode_data_ptr(data)
 
     # TODO real type, not just hardcoded :string
@@ -102,7 +102,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Decodes an instance of `type` from `data`.
   # Made public for testing.
   @doc false
-  def decode_type(data, type, global_properties \\ HashDict.new)
+  def decode_type(data, type, schema \\ HashDict.new)
 
   def decode_type(<<0>> <> rest, :boolean, _), do: {false, rest}
   def decode_type(<<1>> <> rest, :boolean, _), do: {true, rest}
@@ -141,11 +141,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {datetime, rest}
   end
 
-  def decode_type(data, :embedded, global_properties) do
-    decode_embedded(data, global_properties)
+  def decode_type(data, :embedded, schema) do
+    decode_embedded(data, schema)
   end
 
-  def decode_type(data, :embedded_list, global_properties) do
+  def decode_type(data, :embedded_list, schema) do
     {nitems, rest} = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
@@ -160,18 +160,18 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     # actually happen.
     Enum.map_reduce List.duplicate(0, nitems), rest, fn(_, acc) ->
       <<type, acc :: binary>> = acc
-      decode_type(acc, int_to_type(type), global_properties)
+      decode_type(acc, int_to_type(type), schema)
     end
   end
 
-  def decode_type(data, :embedded_set, global_properties) do
-    {elems, rest} = decode_type(data, :embedded_list, global_properties)
+  def decode_type(data, :embedded_set, schema) do
+    {elems, rest} = decode_type(data, :embedded_list, schema)
     {Enum.into(elems, HashSet.new), rest}
   end
 
-  def decode_type(data, :embedded_map, global_properties) do
+  def decode_type(data, :embedded_map, schema) do
     {keys, rest}   = decode_map_header(data)
-    {keys_and_values, rest} = decode_map_values(rest, keys, global_properties)
+    {keys_and_values, rest} = decode_map_values(rest, keys, schema)
 
     {Enum.into(keys_and_values, %{}), rest}
   end
@@ -234,12 +234,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp decode_map_values(data, keys, global_properties) do
+  defp decode_map_values(data, keys, schema) do
     Enum.map_reduce keys, data, fn(map_key(key: key_name, data_type: type, data_ptr: ptr), acc) ->
       if ptr == 0 do
         {{key_name, nil}, acc}
       else
-        {value, acc} = decode_type(acc, type, global_properties)
+        {value, acc} = decode_type(acc, type, schema)
         {{key_name, value}, acc}
       end
     end

@@ -119,7 +119,7 @@ defmodule MarcoPolo.Connection do
     s =
       case :queue.out(s.queue) do
         {{:value, :fetch_schema}, new_queue} ->
-          case Protocol.parse_resp(:record_load, data, %{global_properties: %{}}) do
+          case Protocol.parse_resp(:record_load, data, s.schema) do
             :incomplete ->
               %{s | tail: data}
             {:error, %Error{}, _} ->
@@ -128,7 +128,7 @@ defmodule MarcoPolo.Connection do
               %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
           end
         {{:value, {from, op_name}}, new_queue} ->
-          case Protocol.parse_resp(op_name, data, get_in(s, [:schema, :global_properties])) do
+          case Protocol.parse_resp(op_name, data, s.schema) do
             :incomplete ->
               %{s | tail: data}
             {:error, %Error{} = error, rest} ->
