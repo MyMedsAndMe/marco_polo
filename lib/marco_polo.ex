@@ -279,6 +279,26 @@ defmodule MarcoPolo do
     C.operation(conn, :command, args)
   end
 
+  @doc """
+  Tells the connection (`conn`) to re-fetch the schema of the OrientDB database.
+
+  This is usually used when an `:unknown_property_id` error is returned in orded
+  to fetch the schema again and make all the new properties available.
+
+  This function operates as a "cast" (*fire and forget*) operation, so it
+  returns `:ok` right away.
+
+  ## Examples
+
+      iex> MarcoPolo.fetch_schema(conn)
+      :ok
+
+  """
+  @spec fetch_schema(conn) :: :ok
+  def fetch_schema(conn) do
+    C.fetch_schema(conn)
+  end
+
   defp encode_query_with_type(:sql_query, query, opts) do
     params = opts[:params] || %{}
     args = [query,
@@ -286,7 +306,7 @@ defmodule MarcoPolo do
             Keyword.fetch!(opts, :fetch_plan),
             %Record{class: nil, fields: %{"params" => params}}]
 
-    Enum.map(args, &Protocol.encode_term/1)
+    Protocol.encode_list_of_terms(args)
   end
 
   defp encode_query_with_type(:sql_command, query, opts) do
@@ -301,6 +321,7 @@ defmodule MarcoPolo do
     end
 
     args = args ++ [false]
-    Enum.map(args, &Protocol.encode_term/1)
+
+    Protocol.encode_list_of_terms(args)
   end
 end

@@ -31,6 +31,14 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                         24,           # field value (int with zigzag)
                         "rest">>
 
+  @record_with_property <<0,
+                          6, "foo",
+                          1, # -1 with zigzag, it's the prop id (0 as a prop id)
+                          0, 0, 0, 25,
+                          0,
+                          10, "value",
+                          "rest">>
+
   @list <<4,            # number of items (zigzag, hence 2)
           23,           # type of the elems in the list, OrientDB only supports ANY
           7, 8, "elem", # elem type (string) + value
@@ -43,19 +51,25 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   ## Decoding
 
-  test "decode_embedded/1: record with no fields" do
+  test "decode_embedded/2: record with no fields" do
     assert Ser.decode(@record_no_fields) ==
            {%Record{class: "Klass", fields: %{}}, "rest"}
   end
 
-  test "decode_embedded/1: record with no fields and null class" do
+  test "decode_embedded/2: record with no fields and null class" do
     assert Ser.decode(@record_no_fields_null_class) ==
            {%Record{class: nil}, "rest"}
   end
 
-  test "decode_embedded/1: record with fields" do
+  test "decode_embedded/2: record with fields" do
     record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
     assert Ser.decode(@record_with_fields) == {record, "rest"}
+  end
+
+  test "decode_embedded/2: record with properties" do
+    record = %Record{class: "foo", fields: %{"prop" => "value"}}
+    schema = %{global_properties: %{0 => {"prop", "STRING"}}}
+    assert Ser.decode(@record_with_property, schema) == {record, "rest"}
   end
 
   test "decode_type/2: simple types" do
