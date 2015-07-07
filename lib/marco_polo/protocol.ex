@@ -276,6 +276,17 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
+  defp parse_resp_to_command(<<@null_result, rest :: binary>>, _) do
+    # TODO find out why OrientDB shoves a 0 byte at the end of this binary
+    # dump, not mentioned in the docs :(
+    <<0, rest :: binary>> = rest
+    {nil, rest}
+  end
+
+  defp parse_resp_to_command(<<byte, rest :: binary>>, _) do
+    raise "first byte of response to REQUEST_COMMAND (#{inspect byte}) is unknown"
+  end
+
   defp parse_resp_to_command(_, _) do
     :incomplete
   end
