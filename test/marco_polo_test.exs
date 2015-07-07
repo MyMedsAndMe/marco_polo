@@ -177,6 +177,7 @@ defmodule MarcoPoloTest do
     assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
     assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
     assert {:ok, _unknown} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
+    assert {:ok, nil}      = command(c, "DROP PROPERTY MiscTests.foo")
     assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
     assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
     assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
