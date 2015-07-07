@@ -27,15 +27,20 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # or an "embedded" type, since the leading serialization version byte is not
   # decoded here (but in `decode/1`).
   defp decode_embedded(data, schema) do
-    {class_name, rest}        = decode_type(data, :string)
-    {field_definitions, rest} = decode_header(rest, schema)
-    {fields, rest}            = decode_fields(rest, field_definitions)
+    {class_name, rest} = decode_type(data, :string)
 
-    if class_name == "" do
-      class_name = nil
+    case decode_header(rest, schema) do
+      {field_definitions, rest} ->
+        {fields, rest} = decode_fields(rest, field_definitions)
+
+        if class_name == "" do
+          class_name = nil
+        end
+
+        {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
+      :unknown_property_id ->
+        :unknown_property_id
     end
-
-    {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
   end
 
   defp decode_header(data, schema, acc \\ []) do
@@ -52,22 +57,31 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
         # want to ditch that byte.
         {Enum.reverse(acc), rest}
       i < 0 ->
-        {field, rest} = decode_property_definition(rest, i, schema)
-        decode_header(rest, schema, [field|acc])
+        case decode_property_definition(rest, i, schema) do
+          {field, rest} ->
+            decode_header(rest, schema, [field|acc])
+          :unknown_property_id ->
+            :unknown_property_id
+        end
       i > 0 ->
         {field, rest} = decode_field_definition(:named_field, data)
         decode_header(rest, schema, [field|acc])
     end
   end
 
-  def decode_property_definition(data, encoded_id, schema) do
-    id = (encoded_id * -1) - 1
-    {name, stringified_type} = Dict.fetch!(schema.global_properties, id)
-    {data_ptr, rest} = decode_data_ptr(data)
+  defp decode_property_definition(data, encoded_id, schema) do
+    case Dict.fetch(schema.global_properties, decode_property_id(encoded_id)) do
+      {:ok, {name, stringified_type}} ->
+        {data_ptr, rest} = decode_data_ptr(data)
+        field = field_def(name: name, type: string_to_type(stringified_type), ptr: data_ptr)
+        {field, rest}
+      :error ->
+        :unknown_property_id
+    end
+  end
 
-    # TODO real type, not just hardcoded :string
-    field = field_def(name: name, type: :string, ptr: data_ptr)
-    {field, rest}
+  defp decode_property_id(encoded) do
+    - encoded - 1
   end
 
   # Decodes the definition of a named field in the header (`data`).
@@ -463,5 +477,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   for {type_name, type_id} <- @types do
     defp int_to_type(unquote(type_id)), do: unquote(type_name)
     defp type_to_int(unquote(type_name)), do: unquote(type_id)
+    defp string_to_type(unquote(type_name |> Atom.to_string |> String.upcase)), do: unquote(type_name)
   end
 end

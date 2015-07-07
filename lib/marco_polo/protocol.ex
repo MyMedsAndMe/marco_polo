@@ -75,6 +75,8 @@ defmodule MarcoPolo.Protocol do
         :incomplete
       {:ok, sid, rest} ->
         case parse_resp_contents(op_name, rest, schema) do
+          {:unknown_property_id, rest} ->
+            {:error, :unknown_property_id, rest}
           {resp, rest} ->
             {:ok, sid, resp, rest}
           :incomplete ->
@@ -228,9 +230,15 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(rest, parsers) do
       {[_type, version, record_content], rest} ->
-        {record, <<>>} = RecordSerialization.decode(record_content, schema)
-        record = %{record | version: version}
-        parse_resp_to_record_load(rest, [record|acc], schema)
+        case RecordSerialization.decode(record_content, schema) do
+          {record, <<>>} ->
+            record = %{record | version: version}
+            parse_resp_to_record_load(rest, [record|acc], schema)
+          {_record, _} ->
+            raise "serialized record had more data than expected"
+          :unknown_property_id ->
+            {:unknown_property_id, rest}
+        end
       :incomplete ->
         :incomplete
     end
@@ -240,7 +248,7 @@ defmodule MarcoPolo.Protocol do
     {Enum.reverse(acc), rest}
   end
 
-  defp parse_resp_to_record_load(_, _acc) do
+  defp parse_resp_to_record_load(_, _acc, _) do
     :incomplete
   end
 
@@ -258,13 +266,14 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_command(<<@single_record, rest :: binary>>, schema) do
-    {record, rest} = parse_record_with_rid(rest, schema)
-
-    # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
-    # mentioned in the docs :(
-    <<0>> = rest
-
-    record
+    case GP.parse(rest, [&parse_record_with_rid(&1, schema), &parse(&1, :byte)]) do
+      # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
+      # mentioned in the docs :(
+      {[record, 0], rest} ->
+        {record, rest}
+      :incomplete ->
+        :incomplete
+    end
   end
 
   defp parse_resp_to_command(<<@serialized_result, rest :: binary>>, _) do
@@ -283,7 +292,7 @@ defmodule MarcoPolo.Protocol do
     {nil, rest}
   end
 
-  defp parse_resp_to_command(<<byte, rest :: binary>>, _) do
+  defp parse_resp_to_command(<<byte, _rest :: binary>>, _) do
     raise "first byte of response to REQUEST_COMMAND (#{inspect byte}) is unknown"
   end
 
@@ -307,23 +316,27 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(rest, parsers) do
       {[_record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
-        {record, <<>>} = RecordSerialization.decode(record_content, schema)
-        record = %{record | version: version}
-        {record, rest}
+        case RecordSerialization.decode(record_content, schema) do
+          {record, <<>>} ->
+            record = %{record | version: version}
+            {record, rest}
+          :unknown_property_id ->
+            {:unknown_property_id, rest}
+        end
       :incomplete ->
         :incomplete
     end
   end
 
-  defp parse_record_with_rid(<<-2 :: short, rest :: binary>>) do
+  defp parse_record_with_rid(<<-2 :: short, rest :: binary>>, _schema) do
     {nil, rest}
   end
 
-  defp parse_record_with_rid(<<-3 :: short, rest :: binary>>) do
+  defp parse_record_with_rid(<<-3 :: short, rest :: binary>>, _schema) do
     GP.parse(rest, [&parse(&1, :short), &parse(&1, :long)])
   end
 
-  defp parse_record_with_rid(_) do
+  defp parse_record_with_rid(_, _schema) do
     :incomplete
   end
 

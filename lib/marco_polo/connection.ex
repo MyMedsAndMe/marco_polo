@@ -34,7 +34,7 @@ defmodule MarcoPolo.Connection do
         err
       {:ok, pid} = res ->
         case Keyword.fetch!(opts, :connection) do
-          {:db, _, _} -> Connection.cast(pid, :fetch_schema)
+          {:db, _, _} -> fetch_schema(pid)
           _           -> nil
         end
 
@@ -44,6 +44,10 @@ defmodule MarcoPolo.Connection do
 
   def operation(pid, op_name, args) do
     Connection.call(pid, {:operation, op_name, args})
+  end
+
+  def fetch_schema(pid) do
+    Connection.cast(pid, :fetch_schema)
   end
 
   ## Callbacks.
@@ -131,7 +135,10 @@ defmodule MarcoPolo.Connection do
           case Protocol.parse_resp(op_name, data, s.schema) do
             :incomplete ->
               %{s | tail: data}
-            {:error, %Error{} = error, rest} ->
+            {:unknown_property_id, rest} ->
+              Connection.reply(from, {:error, :unknown_property_id})
+              %{s | tail: rest}
+            {:error, error, rest} ->
               Connection.reply(from, {:error, error})
               %{s | tail: rest, queue: new_queue}
             {:ok, ^sid, resp, rest} ->
