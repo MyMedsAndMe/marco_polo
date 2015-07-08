@@ -9,16 +9,36 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   Record.defrecordp :field_def, [:name, :ptr, :type]
 
   @doc """
-  Parses a binary-serialized record.
+  Decodes a binary-serialized record into a `MarcoPolo.Record` struct.
+
+  This function decodes the bytes representing a record into a
+  `MarcoPolo.Record` struct. The record is assumed to be serialized with the
+  `ORecordSerializerBinary` serialization. `data` is the full data about the
+  record, it has no exceeding data and it's not incomplete. Note that `data`
+  represents the bytes for the record content, without the leading int for the
+  length of the byte array you would expect from OrientDB's binary
+  protocol. This happens because this function is usually called from the parser
+  that parsed the byte array.
   """
-  @spec decode(binary, Dict.t) :: {non_neg_integer, String.t, %{}}
-  def decode(data, schema \\ HashDict.new) do
+  @spec decode(binary, Dict.t) :: MarcoPolo.Record.t
+  def decode(data, schema \\ %{}) do
     <<_version, rest :: binary>> = data
     decode_embedded(rest, schema)
   end
 
   @doc """
+  Serializes a given record using the schemaless serialization protocol.
+
+  The record is serialized using the `ORecordSerializerBinary`
+  serialization. This function always returns iodata that can be converted to
+  binary using `IO.iodata_to_binary/1`.
+
+  This function is the "dual" of `decode/2`, so this is always true:
+
+      decode(encode(record)) = record
+
   """
+  @spec encode(MarcoPolo.Record.t) :: iodata
   def encode(%MarcoPolo.Record{} = record) do
     [0, encode_embedded(record, 1)]
   end
