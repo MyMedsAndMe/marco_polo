@@ -4,7 +4,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   require Record
 
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
-  Record.defrecordp :field_def, [:name, :ptr, :type]
+  Record.defrecordp :field, [:name, :ptr, :type]
 
   @doc """
   Decodes a binary-serialized record into a `MarcoPolo.Record` struct.
@@ -63,67 +63,64 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_header(data, schema, acc \\ []) do
-    {i, rest} = :small_ints.decode_zigzag_varint(data)
-
     # If `i` is positive, that means the next field definition is a "named
     # field" and `i` is the length of the field's name. If it's negative, it
     # represents the property id of a property. If it's 0, it signals the end of
     # the header segment.
-    cond do
-      i == 0 ->
+
+    case :small_ints.decode_zigzag_varint(data) do
+      {0, rest} ->
         # Remember to return `rest` and not `data` since `rest` doesn't contain
-        # the 0 byte that signals the end of the header, while `data` does; we
-        # want to ditch that byte.
+        # the 0 byte that signals the end of the header, while `data` does.
         {Enum.reverse(acc), rest}
-      i < 0 ->
+      {i, rest} when i < 0 ->
         case decode_property_definition(rest, i, schema) do
           {field, rest} ->
             decode_header(rest, schema, [field|acc])
           :unknown_property_id ->
             :unknown_property_id
         end
-      i > 0 ->
-        {field, rest} = decode_field_definition(:named_field, data)
+      {i, _} when i > 0 ->
+        {field, rest} = decode_field_definition(data)
         decode_header(rest, schema, [field|acc])
     end
   end
 
   defp decode_property_definition(data, encoded_id, schema) do
-    case Dict.fetch(schema.global_properties, decode_property_id(encoded_id)) do
-      {:ok, {name, stringified_type}} ->
-        {data_ptr, rest} = decode_data_ptr(data)
-        field = field_def(name: name, type: string_to_type(stringified_type), ptr: data_ptr)
+    # That's how you decode property ids.
+    id = - encoded_id - 1
+
+    case Dict.fetch(schema.global_properties, id) do
+      {:ok, {name, type_as_string}} ->
+        {ptr, rest} = decode_data_ptr(data)
+        field       = field(name: name, type: string_to_type(type_as_string), ptr: ptr)
         {field, rest}
       :error ->
         :unknown_property_id
     end
   end
 
-  defp decode_property_id(encoded) do
-    - encoded - 1
-  end
-
   # Decodes the definition of a named field in the header (`data`).
-  defp decode_field_definition(:named_field, data) do
-    {field_name, rest}            = decode_type(data, :string)
-    {data_ptr, rest}              = decode_data_ptr(rest)
-    <<data_type, rest :: binary>> = rest
+  defp decode_field_definition(data) do
+    {name, rest}             = decode_type(data, :string)
+    {ptr, rest}              = decode_data_ptr(rest)
+    <<type, rest :: binary>> = rest
 
-    field = field_def(name: field_name, type: int_to_type(data_type), ptr: data_ptr)
-    {field, rest}
+    {field(name: name, type: int_to_type(type), ptr: ptr), rest}
   end
 
   defp decode_fields(data, field_definitions) do
-    {fields, rest} = Enum.map_reduce field_definitions, data, fn(field_def(name: name) = f, acc) ->
-      if field_def(f, :ptr) == 0 do
-        {{name, nil}, acc}
-      else
-        {value, rest} = decode_type(acc, field_def(f, :type))
-        {{name, value}, rest}
-      end
-    end
-
+    {fields, rest} = Enum.map_reduce(field_definitions, data, &decode_field/2)
     {Enum.into(fields, %{}), rest}
+  end
+
+  defp decode_field(field(name: name, ptr: 0), data) do
+    {{name, nil}, data}
+  end
+
+  defp decode_field(field(name: name, type: type), data) do
+    {value, rest} = decode_type(data, type)
+    {{name, value}, rest}
   end
 
   # The pointer to the data is just a signed int32.
