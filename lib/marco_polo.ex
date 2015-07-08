@@ -294,7 +294,7 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec fetch_schema(conn) :: :ok
+  @spec fetch_schema(pid) :: :ok
   def fetch_schema(conn) do
     C.fetch_schema(conn)
   end
