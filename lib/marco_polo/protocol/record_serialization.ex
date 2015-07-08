@@ -50,7 +50,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     case decode_header(rest, schema) do
       {field_definitions, rest} ->
-        {fields, rest} = decode_fields(rest, field_definitions)
+        {fields, rest} = decode_fields(rest, field_definitions, schema)
 
         if class_name == "" do
           class_name = nil
@@ -109,17 +109,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {field(name: name, type: int_to_type(type), ptr: ptr), rest}
   end
 
-  defp decode_fields(data, field_definitions) do
-    {fields, rest} = Enum.map_reduce(field_definitions, data, &decode_field/2)
+  defp decode_fields(data, field_definitions, schema) do
+    {fields, rest} = Enum.map_reduce(field_definitions, data, &decode_field(&2, &1, schema))
     {Enum.into(fields, %{}), rest}
   end
 
-  defp decode_field(field(name: name, ptr: 0), data) do
+  defp decode_field(data, field(name: name, ptr: 0), _schema) do
     {{name, nil}, data}
   end
 
-  defp decode_field(field(name: name, type: type), data) do
-    {value, rest} = decode_type(data, type)
+  defp decode_field(data, field(name: name, type: type), schema) do
+    {value, rest} = decode_type(data, type, schema)
     {{name, value}, rest}
   end
 
@@ -176,20 +176,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :embedded_list, schema) do
-    {nitems, rest} = :small_ints.decode_zigzag_varint(data)
+    {nitems, rest}           = :small_ints.decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
     # Only ANY is supported by OrientDB at the moment.
     :any = int_to_type(type)
 
-    # OPTIMIZE: I have to find a better (clean) way to `map_reduce` n times
-    # instead of mapreducing over a list of n times the number 0, which is
-    # uselessly expensive to build and plain useless. A range doesn't work
-    # because `Enum.to_list(1..0)` is `[1, 0]` which makes sense, but my
-    # 1..nitems has to translate to `[]` so that the mapreducing doesn't
-    # actually happen.
-    Enum.map_reduce List.duplicate(0, nitems), rest, fn(_, acc) ->
-      <<type, acc :: binary>> = acc
+    Enum.map_reduce List.duplicate(nil, nitems), rest, fn(_, <<type, acc :: binary>>) ->
       decode_type(acc, int_to_type(type), schema)
     end
   end
@@ -200,10 +193,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :embedded_map, schema) do
-    {keys, rest}   = decode_map_header(data)
-    {keys_and_values, rest} = decode_map_values(rest, keys, schema)
+    {keys, rest}  = decode_map_header(data)
+    {pairs, rest} = decode_map_values(rest, keys, schema)
 
-    {Enum.into(keys_and_values, %{}), rest}
+    {Enum.into(pairs, %{}), rest}
   end
 
   def decode_type(<<cluster_id :: 32, position :: 32, rest :: binary>>, :link, _) do
@@ -212,7 +205,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   def decode_type(data, :link_list, _) do
     {nelems, rest} = :small_ints.decode_zigzag_varint(data)
-    {elems, rest} = Enum.map_reduce List.duplicate(0, nelems), rest, fn(_, acc) ->
+    {elems, rest} = Enum.map_reduce List.duplicate(nil, nelems), rest, fn(_, acc) ->
       decode_type(acc, :link)
     end
 
@@ -239,9 +232,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :decimal, _) do
-    <<scale :: 32, value_size :: 32, rest :: binary>> = data
-    nbits = value_size * 8
-    <<value :: size(nbits)-big, rest :: binary>> = rest
+    <<scale :: 32, value_size :: 32, rest :: binary>>         = data
+    <<value :: big-size(value_size)-unit(8), rest :: binary>> = rest
 
     value = value / round(:math.pow(10, scale))
     {Decimal.new(value), rest}
@@ -252,7 +244,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
 
-    Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
+    Enum.map_reduce List.duplicate(nil, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
       # For now, OrientDB only supports STRING keys.
       :string = int_to_type(string_type)
 
@@ -260,19 +252,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       {ptr, acc} = decode_data_ptr(acc)
       <<type, acc :: binary>> = acc
 
-      {map_key(key: key, data_type: int_to_type(type), data_ptr: ptr), acc}
+      {field(name: key, type: int_to_type(type), ptr: ptr), acc}
     end
   end
 
   defp decode_map_values(data, keys, schema) do
-    Enum.map_reduce keys, data, fn(map_key(key: key_name, data_type: type, data_ptr: ptr), acc) ->
-      if ptr == 0 do
-        {{key_name, nil}, acc}
-      else
-        {value, acc} = decode_type(acc, type, schema)
-        {{key_name, value}, acc}
-      end
-    end
+    Enum.map_reduce(keys, data, &decode_field(&2, &1, schema))
   end
 
   defp encode_fields(%{} = fields, offset) do
