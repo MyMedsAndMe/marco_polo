@@ -1,7 +1,5 @@
 defmodule MarcoPolo.QueryParser do
-  @moduledoc """
-  Facilities for parsing OrientDB queries.
-  """
+  @moduledoc false
 
   @doc """
   Returns the query type of the given `query`.

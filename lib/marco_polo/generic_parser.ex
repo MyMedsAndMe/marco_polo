@@ -1,20 +1,21 @@
 defmodule MarcoPolo.GenericParser do
-  @moduledoc """
-  Provides facilities for parsing binary data with support for incomplete data.
+  @moduledoc false
 
-  This module provides functions for parsing binary data through given *parsers*
-  (which are just functions). What makes this module useful over manually
-  parsing these data is its declarativeness (you just list what data you expect)
-  as well as its support for incomplete data.
+  # Provides facilities for parsing binary data with support for incomplete
+  # data.
 
-  Incomplete data means data that ends before they can be fully parsed. For
-  example, an OrientDB long takes 8 bytes, so if you want to parse a long and
-  the binary contains less than 8 bytes than it's incomplete. Incomplete
-  responses are not handled in this module (which just returns `:incomplete`
-  when a response is incomplete), but on a higher level (the connection server,
-  which caches the incomplete data until it receives new data, then tries to
-  parse again).
-  """
+  # This module provides functions for parsing binary data through given
+  # *parsers* (which are just functions). What makes this module useful over
+  # manually parsing these data is its declarativeness (you just list what data
+  # you expect) as well as its support for incomplete data.
+
+  # Incomplete data means data that ends before they can be fully parsed. For
+  # example, an OrientDB long takes 8 bytes, so if you want to parse a long and
+  # the binary contains less than 8 bytes than it's incomplete. Incomplete
+  # responses are not handled in this module (which just returns `:incomplete`
+  # when a response is incomplete), but on a higher level (the connection
+  # server, which caches the incomplete data until it receives new data, then
+  # tries to parse again).
 
   @typedoc """
   Type returned by the parsing functions in this module.

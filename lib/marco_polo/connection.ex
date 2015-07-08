@@ -1,4 +1,6 @@
 defmodule MarcoPolo.Connection do
+  @moduledoc false
+
   use Connection
 
   require Logger
