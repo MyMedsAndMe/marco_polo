@@ -20,7 +20,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   """
   @spec decode(binary, Dict.t) :: MarcoPolo.Record.t
   def decode(data, schema \\ %{}) do
-    <<_version, rest :: binary>> = data
+    <<_serialization_version, rest :: binary>> = data
     decode_embedded(rest, schema)
   end
 
@@ -38,6 +38,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   """
   @spec encode(MarcoPolo.Record.t) :: iodata
   def encode(%MarcoPolo.Record{} = record) do
+    # 0 is the serialization version (as a byte), not the record version.
     [0, encode_embedded(record, 1)]
   end
 
