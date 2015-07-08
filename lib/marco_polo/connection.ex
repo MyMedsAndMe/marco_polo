@@ -35,11 +35,7 @@ defmodule MarcoPolo.Connection do
       {:error, _} = err ->
         err
       {:ok, pid} = res ->
-        case Keyword.fetch!(opts, :connection) do
-          {:db, _, _} -> fetch_schema(pid)
-          _           -> nil
-        end
-
+        maybe_fetch_schema(pid, opts)
         res
     end
   end
@@ -50,6 +46,13 @@ defmodule MarcoPolo.Connection do
 
   def fetch_schema(pid) do
     Connection.cast(pid, :fetch_schema)
+  end
+
+  defp maybe_fetch_schema(pid, opts) do
+    case Keyword.get(opts, :connection) do
+      {:db, _, _} -> fetch_schema(pid)
+      _           -> nil
+    end
   end
 
   ## Callbacks.
