@@ -322,10 +322,6 @@ defmodule MarcoPolo.Protocol do
     {nil, rest}
   end
 
-  defp parse_resp_to_command(<<byte, _rest :: binary>>, _) do
-    raise "first byte of response to REQUEST_COMMAND (#{inspect byte}) is unknown"
-  end
-
   defp parse_resp_to_command(_, _) do
     :incomplete
   end
