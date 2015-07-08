@@ -243,12 +243,6 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
-  @null_result       ?n
-  @list              ?l
-  @set               ?s
-  @single_record     ?r
-  @serialized_result ?a
-
   defp parse_resp_contents(:command, data, schema) do
     parse_resp_to_command(data, schema)
   end
@@ -282,6 +276,12 @@ defmodule MarcoPolo.Protocol do
     :incomplete
   end
 
+  @null_result       ?n
+  @list              ?l
+  @set               ?s
+  @single_record     ?r
+  @serialized_result ?a
+
   defp parse_resp_to_command(<<type, data :: binary>>, schema)
       when type in [@list, @set] do
     parsers = [GP.array_parser(&decode_term(&1, :int), &parse_record_with_rid(&1, schema)),
@@ -299,10 +299,8 @@ defmodule MarcoPolo.Protocol do
     case GP.parse(rest, [&parse_record_with_rid(&1, schema), &decode_term(&1, :byte)]) do
       # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
       # mentioned in the docs :(
-      {[record, 0], rest} ->
-        {record, rest}
-      :incomplete ->
-        :incomplete
+      {[record, 0], rest} -> {record, rest}
+      :incomplete         -> :incomplete
     end
   end
 
@@ -311,7 +309,7 @@ defmodule MarcoPolo.Protocol do
       # TODO find out why OrientDB shoves a 0 byte at the end of this binary
       # dump, not mentioned in the docs :(
       {[binary, 0], rest} -> {binary, rest}
-      _                   -> :incomplete
+      :incomplete         -> :incomplete
     end
   end
 
