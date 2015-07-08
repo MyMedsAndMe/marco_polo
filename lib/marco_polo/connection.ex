@@ -95,7 +95,7 @@ defmodule MarcoPolo.Connection do
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
     req = Protocol.encode_op(op_name, [sid|args])
 
-    s = update_in(s.queue, &:queue.in({from, op_name}, &1))
+    s = enqueue(s, {from, op_name})
 
     :gen_tcp.send(s.socket, req)
     {:noreply, s}
@@ -106,7 +106,7 @@ defmodule MarcoPolo.Connection do
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
-    s = update_in(s.queue, &:queue.in(:fetch_schema, &1))
+    s = enqueue(s, :fetch_schema)
 
     :gen_tcp.send(s.socket, req)
     {:noreply, s}
@@ -116,7 +116,6 @@ defmodule MarcoPolo.Connection do
   def handle_info(msg, state)
 
   def handle_info({:tcp, socket, msg}, %{session_id: sid, socket: socket} = s) do
-    # Reactivate the socket.
     :inet.setopts(socket, active: :once)
     data = s.tail <> msg
 
@@ -244,5 +243,9 @@ defmodule MarcoPolo.Connection do
       end
 
     %{global_properties: global_properties}
+  end
+
+  defp enqueue(s, what) do
+    update_in s.queue, &:queue.in(what, &1)
   end
 end
