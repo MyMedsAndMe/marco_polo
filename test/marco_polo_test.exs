@@ -2,6 +2,7 @@ defmodule MarcoPoloTest do
   use ExUnit.Case, async: true
 
   alias MarcoPolo.Error
+  alias MarcoPolo.Record
 
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
@@ -15,221 +16,210 @@ defmodule MarcoPoloTest do
     assert is_pid(pid)
   end
 
-  test "db_exists?/3" do
-    {:ok, c} = conn_server()
-    assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", "plocal")
-    assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
+  defmodule ConnectedToServer do
+    use ExUnit.Case, async: true
+
+    setup do
+      {:ok, conn} = MarcoPolo.start_link(
+        connection: :server,
+        user: TestHelpers.user(),
+        password: TestHelpers.password()
+      )
+
+      {:ok, %{conn: conn}}
+    end
+
+    test "db_exists?/3", %{conn: c}  do
+      assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", "plocal")
+      assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
+    end
+
+    test "create_db/4 with a database that doens't exist yet", %{conn: c} do
+      assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGenerated", :document, :plocal)
+    end
+
+    test "create_db/4 with a database that already exists", %{conn: c} do
+      assert {:error, %Error{} = err} = MarcoPolo.create_db(c, "MarcoPoloTest", :document, :plocal)
+      assert [{exception, msg}] = err.errors
+      assert exception == "com.orientechnologies.orient.core.exception.ODatabaseException"
+      assert msg       =~ "Database named 'MarcoPoloTest' already exists:"
+    end
+
+    test "drop_db/3 with an existing database", %{conn: c} do
+      assert :ok = MarcoPolo.drop_db(c, "MarcoPoloToDrop", :memory)
+    end
+
+    test "drop_db/3 with a non-existing database", %{conn: c} do
+      expected = {"com.orientechnologies.orient.core.exception.OStorageException",
+                  "Database with name 'Nonexistent' doesn't exits."}
+
+      assert {:error, %MarcoPolo.Error{} = err} = MarcoPolo.drop_db(c, "Nonexistent", :plocal)
+      assert hd(err.errors) == expected
+    end
   end
 
-  test "create_db/4 with a database that doens't exist yet" do
-    {:ok, c} = conn_server()
-    assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGenerated", :document, :plocal)
-  end
+  defmodule ConnectedToDb do
+    use ExUnit.Case, async: true
 
-  test "create_db/4 with a database that already exists" do
-    {:ok, c} = conn_server()
+    setup do
+      {:ok, conn} = MarcoPolo.start_link(
+        connection: {:db, "MarcoPoloTest", "plocal"},
+        user: TestHelpers.user(),
+        password: TestHelpers.password()
+      )
 
-    assert {:error, %Error{} = err} = MarcoPolo.create_db(c, "MarcoPoloTest", :document, :plocal)
-    assert [{exception, msg}] = err.errors
-    assert exception == "com.orientechnologies.orient.core.exception.ODatabaseException"
-    assert msg       =~ "Database named 'MarcoPoloTest' already exists:"
-  end
+      {:ok, %{conn: conn}}
+    end
 
-  test "drop_db/3 with an existing database" do
-    {:ok, c} = conn_server()
-    assert :ok = MarcoPolo.drop_db(c, "MarcoPoloToDrop", :memory)
-  end
+    test "db_reload/1", %{conn: c} do
+      assert :ok = MarcoPolo.db_reload(c)
+    end
 
-  test "drop_db/3 with a non-existing database" do
-    {:ok, c} = conn_server()
+    test "db_size/1", %{conn: c} do
+      assert {:ok, size} = MarcoPolo.db_size(c)
+      assert is_integer(size)
+    end
 
-    expected = {"com.orientechnologies.orient.core.exception.OStorageException",
-                "Database with name 'Nonexistent' doesn't exits."}
+    test "db_countrecords/1", %{conn: c} do
+      assert {:ok, nrecords} = MarcoPolo.db_countrecords(c)
+      assert is_integer(nrecords)
+    end
 
-    assert {:error, %MarcoPolo.Error{} = err} = MarcoPolo.drop_db(c, "Nonexistent", :plocal)
-    assert hd(err.errors) == expected
-  end
+    test "load_record/4", %{conn: c} do
+      rid = TestHelpers.record_rid("record_load")
 
-  test "db_reload/1" do
-    {:ok, c} = conn_db()
-    assert :ok = MarcoPolo.db_reload(c)
-  end
+      {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
 
-  test "db_size/1" do
-    {:ok, c} = conn_db()
-    assert {:ok, size} = MarcoPolo.db_size(c)
-    assert is_integer(size)
-  end
-
-  test "db_countrecords/1" do
-    {:ok, c} = conn_db()
-    assert {:ok, nrecords} = MarcoPolo.db_countrecords(c)
-    assert is_integer(nrecords)
-  end
-
-  test "load_record/4" do
-    {:ok, c} = conn_db()
-
-    rid = TestHelpers.record_rid("record_load")
-
-    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
-
-    assert %MarcoPolo.Record{} = record
-    assert record.version == 1
-    assert record.class   == "Schemaless"
-    assert record.fields  == %{"name" => "record_load"}
-
-    rid = TestHelpers.record_rid("schemaless_record_load")
-
-    {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
-    assert record.version == 1
-    assert record.class == "Schemaful"
-    assert record.fields == %{"myString" => "record_load"}
-  end
-
-  test "load_record/4 using the :if_version_not_latest option" do
-    {:ok, c} = conn_db()
-    rid      = TestHelpers.record_rid("record_load")
-
-    assert {:ok, []} = MarcoPolo.load_record(c, rid, "*:-1", version: 1, if_version_not_latest: true)
-  end
-
-  test "delete_record/3" do
-    {:ok, c} = conn_db()
-    version  = 1
-    rid      = TestHelpers.record_rid("record_delete")
-
-    # Wrong version causes no deletions.
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 100)
-
-    assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
-  end
-
-  test "create_record/3" do
-    {:ok, c} = conn_db()
-    cluster_id = TestHelpers.cluster_id("schemaless")
-    record = %MarcoPolo.Record{class: "Schemaless", fields: %{"foo" => "bar"}}
-
-    {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
-
-    assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
-    assert is_integer(version)
-  end
-
-  test "command/3: SELECT query without a WHERE clause" do
-    {:ok, c}       = conn_db()
-    {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
-
-    assert Enum.find(records, fn record ->
       assert %MarcoPolo.Record{} = record
-      assert record.class == "Schemaless"
+      assert record.version == 1
+      assert record.class   == "Schemaless"
+      assert record.fields  == %{"name" => "record_load"}
 
-      record.fields["name"] == "record_load"
-    end)
-  end
+      rid = TestHelpers.record_rid("schemaless_record_load")
 
-  test "command/3: SELECT query with a WHERE clause" do
-    {:ok, c} = conn_db()
+      {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
+      assert record.version == 1
+      assert record.class == "Schemaful"
+      assert record.fields == %{"myString" => "record_load"}
+    end
 
-    cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
-    res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
+    test "load_record/4 using the :if_version_not_latest option", %{conn: c} do
+      rid = TestHelpers.record_rid("record_load")
 
-    assert {:ok, [%MarcoPolo.Record{} = record]} = res
-    assert record.fields["name"] == "record_load"
-  end
+      assert {:ok, []} = MarcoPolo.load_record(c, rid, "*:-1", version: 1, if_version_not_latest: true)
+    end
 
-  test "command/3: SELECT query with a WHERE clause and parameters" do
-    {:ok, c} = conn_db()
+    test "delete_record/3", %{conn: c} do
+      version  = 1
+      rid      = TestHelpers.record_rid("record_delete")
 
-    cmd    = "SELECT FROM Schemaless WHERE name = :name"
-    params = %{"name" => "record_load"}
-    res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
+      # Wrong version causes no deletions.
+      assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 100)
 
-    assert {:ok, [%MarcoPolo.Record{} = record]} = res
-    assert record.fields["name"] == "record_load"
-  end
+      assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
+      assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
+    end
 
-  test "command/3: INSERT query inserting multiple records" do
-    {:ok, c} = conn_db()
-    cmd = "INSERT INTO Schemaless(my_field) VALUES ('value1'), ('value2')"
+    test "create_record/3", %{conn: c} do
+      cluster_id = TestHelpers.cluster_id("schemaless")
+      record = %Record{class: "Schemaless", fields: %{"foo" => "bar"}}
 
-    assert {:ok, [r1, r2]} = MarcoPolo.command(c, cmd)
-    assert r1.fields["my_field"] == "value1"
-    assert r2.fields["my_field"] == "value2"
-  end
+      {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
 
-  test "command/3: UPDATE query with parameters" do
-    {:ok, c} = conn_db()
-    cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
-    params = %{"name" => "record_update", "f" => "new_value"}
+      assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
+      assert is_integer(version)
+    end
 
-    # TODO the response is a binary dump with "1" in it, not sure what that
-    # means.
-    assert {:ok, "1"} = MarcoPolo.command(c, cmd, params: params)
-  end
+    test "command/3: SELECT query without a WHERE clause", %{conn: c} do
+      {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
 
-  test "command/3: miscellaneous commands" do
-    import MarcoPolo, only: [command: 2, command: 3]
+      assert Enum.find(records, fn record ->
+        assert %Record{} = record
+        assert record.class == "Schemaless"
 
-    {:ok, c} = conn_db()
+        record.fields["name"] == "record_load"
+      end)
+    end
 
-    assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
-    assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
-    assert {:ok, _unknown} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
-    assert {:ok, nil}      = command(c, "DROP PROPERTY MiscTests.foo")
-    assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
-    assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
-    assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
-  end
+    test "command/3: SELECT query with a WHERE clause", %{conn: c} do
+      cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
+      res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
 
-  test "command/3 and fetch_schema/1: unknown property id" do
-    import MarcoPolo, only: [command: 2, command: 3]
+      assert {:ok, [%Record{} = record]} = res
+      assert record.fields["name"] == "record_load"
+    end
 
-    insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
+    test "command/3: SELECT query with a WHERE clause and parameters", %{conn: c} do
+      cmd    = "SELECT FROM Schemaless WHERE name = :name"
+      params = %{"name" => "record_load"}
+      res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
 
-    {:ok, c} = conn_db()
-    {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
-    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
+      assert {:ok, [%Record{} = record]} = res
+      assert record.fields["name"] == "record_load"
+    end
 
-    assert {:error, :unknown_property_id} = command(c, insert_query)
+    test "command/3: INSERT query inserting multiple records", %{conn: c} do
+      cmd = "INSERT INTO Schemaless(my_field) VALUES ('value1'), ('value2')"
 
-    :ok = MarcoPolo.fetch_schema(c)
+      assert {:ok, [r1, r2]} = MarcoPolo.command(c, cmd)
+      assert r1.fields["my_field"] == "value1"
+      assert r2.fields["my_field"] == "value2"
+    end
 
-    assert {:ok, %MarcoPolo.Record{} = record} = command(c, insert_query)
-    assert record.class   == "UnknownPropertyId"
-    assert record.version == 1
-    assert record.fields  == %{"i" => 30}
-  end
+    test "command/3: UPDATE query with parameters", %{conn: c} do
+      cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
+      params = %{"name" => "record_update", "f" => "new_value"}
 
-  test "script/4" do
-    {:ok, c} = conn_db()
+      # TODO the response is a binary dump with "1" in it, not sure what that
+      # means.
+      assert {:ok, "1"} = MarcoPolo.command(c, cmd, params: params)
+    end
 
-    script = """
-    db.command('CREATE CLASS ScriptTest');
+    test "command/3: miscellaneous commands", %{conn: c} do
+      import MarcoPolo, only: [command: 2, command: 3]
 
-    for (i = 1; i <= 3; i++) {
+      assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
+      assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+      assert {:ok, _unknown} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
+      assert {:ok, nil}      = command(c, "DROP PROPERTY MiscTests.foo")
+      assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
+      assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
+    end
+
+    test "command/3 and fetch_schema/1: unknown property id", %{conn: c} do
+      import MarcoPolo, only: [command: 2, command: 3]
+
+      insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
+
+      {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
+      {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
+
+      assert {:error, :unknown_property_id} = command(c, insert_query)
+
+      :ok = MarcoPolo.fetch_schema(c)
+
+      assert {:ok, %Record{} = record} = command(c, insert_query)
+      assert record.class   == "UnknownPropertyId"
+      assert record.version == 1
+      assert record.fields  == %{"i" => 30}
+    end
+
+    test "script/4", %{conn: c} do
+      script = """
+      db.command('CREATE CLASS ScriptTest');
+
+      for (i = 1; i <= 3; i++) {
       db.command('INSERT INTO ScriptTest(foo) VALUES("test' + i + '")');
-    }
-    """
+      }
+      """
 
-    assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
+      assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
 
-    {:ok, records} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
-    records = Enum.map records, fn(%MarcoPolo.Record{fields: %{"foo" => value}}) -> value end
+      {:ok, records} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
+      records = Enum.map(records, fn(%Record{fields: %{"foo" => value}}) -> value end)
 
-    assert records == ~w(test1 test2 test3)
-  end
-
-  defp conn_server do
-    MarcoPolo.start_link(connection: :server,
-                         user: TestHelpers.user(),
-                         password: TestHelpers.password())
-  end
-
-  defp conn_db do
-    MarcoPolo.start_link(connection: {:db, "MarcoPoloTest", "plocal"},
-                         user: TestHelpers.user(),
-                         password: TestHelpers.password())
+      assert records == ~w(test1 test2 test3)
+    end
   end
 end
