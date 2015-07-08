@@ -186,18 +186,16 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:record_create, data, _) do
-    case GP.parse(data, [&parse(&1, :short), &parse(&1, :long), &parse(&1, :int)]) do
-      {args, rest} ->
-        IO.puts :stderr, """
-        A response to a REQUEST_RECORD_CREATE operation has been parsed, but
-        `GenericParser` hasn't been used. Parsing the end of a
-        REQUEST_RECORD_CREATE operation is a very annoying task, so I'm putting
-        it off for later. For now, we assume that the response is well-formed
-        and not incomplete or abundant (we discard everthing that remains after
-        parsing the rid and the version). For reference, the remaining bytes
-        are: `#{inspect rest}`
-        """
-        {args, ""}
+    parsers = [
+      &parse(&1, :short), # cluster id
+      &parse(&1, :long),  # cluster position
+      &parse(&1, :int),   # version
+      &parse_collection_changes/1,
+    ]
+
+    case GP.parse(data, parsers) do
+      {[cluster_id, position, version, _], rest} ->
+        {[cluster_id, position, version], rest}
       :incomplete ->
         :incomplete
     end
@@ -338,6 +336,18 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_record_with_rid(_, _schema) do
     :incomplete
+  end
+
+  defp parse_collection_changes(data) do
+    array_elem_parsers = [
+      &parse(&1, :long),
+      &parse(&1, :long),
+      &parse(&1, :long),
+      &parse(&1, :long),
+      &parse(&1, :int),
+    ]
+
+    GP.parse(data, GP.array_parser(&parse(&1, :int), array_elem_parsers))
   end
 
   defp req_code(:shutdown),                          do: 1
