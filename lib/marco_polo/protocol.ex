@@ -8,6 +8,7 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.GenericParser, as: GP
   alias MarcoPolo.Error
   alias MarcoPolo.Document
+  alias MarcoPolo.RID
   alias MarcoPolo.Protocol.RecordSerialization
 
   @type encodable_term ::
@@ -339,12 +340,13 @@ defmodule MarcoPolo.Protocol do
     ]
 
     case GP.parse(rest, parsers) do
-      {[_record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
+      {[?d, cluster_id, cluster_pos, version, record_content], rest} ->
         case RecordSerialization.decode(record_content, schema) do
           :unknown_property_id ->
             {:unknown_property_id, rest}
           record ->
-            record = %{record | version: version}
+            rid    = %RID{cluster_id: cluster_id, position: cluster_pos}
+            record = %{record | version: version, rid: rid}
             {record, rest}
         end
       :incomplete ->
