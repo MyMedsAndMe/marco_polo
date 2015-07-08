@@ -280,6 +280,39 @@ defmodule MarcoPolo do
   end
 
   @doc """
+  Executes a script in the given `language` on the database `conn` is connected
+  to.
+
+  The text of the script is passed as `text`. `opts` is a list of options.
+
+  **Note**: for this to work, scripting must be enabled in the server
+  configuration. You can read more about scripting in the [OrientDB
+  docs](http://orientdb.com/docs/last/Javascript-Command.html#Enable_Server_side_scripting).
+
+  ## Examples
+
+      iex> script = "for (i = 0; i < 3; i++) db.command('INSERT INTO Foo(idx) VALUES (' + i + ')');"
+      iex> {:ok, last_record} = MarcoPolo.script(conn, "Javascript", script)
+      iex> last_record.fields["idx"]
+      2
+
+  """
+  @spec script(pid, String.t, String.t, Keyword.t) :: {:ok, term}
+  def script(conn, language, text, opts \\ []) do
+    command_class_name = Protocol.encode_term("s")
+
+    payload = [Protocol.encode_term(language),
+               encode_query_with_type(:sql_command, text, opts)]
+
+    args = [{:raw, "s"}, # synchronous mode
+            IO.iodata_length([command_class_name, payload]),
+            {:raw, command_class_name},
+            {:raw, payload}]
+
+    C.operation(conn, :command, args)
+  end
+
+  @doc """
   Tells the connection (`conn`) to re-fetch the schema of the OrientDB database.
 
   This is usually used when an `:unknown_property_id` error is returned in orded

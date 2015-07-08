@@ -202,6 +202,25 @@ defmodule MarcoPoloTest do
     assert record.fields  == %{"i" => 30}
   end
 
+  test "script/4" do
+    {:ok, c} = conn_db()
+
+    script = """
+    db.command('CREATE CLASS ScriptTest');
+
+    for (i = 1; i <= 3; i++) {
+      db.command('INSERT INTO ScriptTest(foo) VALUES("test' + i + '")');
+    }
+    """
+
+    assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
+
+    {:ok, records} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
+    records = Enum.map records, fn(%MarcoPolo.Record{fields: %{"foo" => value}}) -> value end
+
+    assert records == ~w(test1 test2 test3)
+  end
+
   defp conn_server do
     MarcoPolo.start_link(connection: :server,
                          user: TestHelpers.user(),
