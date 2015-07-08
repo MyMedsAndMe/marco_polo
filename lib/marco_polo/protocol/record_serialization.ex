@@ -19,7 +19,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   protocol. This happens because this function is usually called from the parser
   that parsed the byte array.
   """
-  @spec decode(binary, Dict.t) :: MarcoPolo.Record.t
+  @spec decode(binary, Dict.t) :: Document.t
   def decode(data, schema \\ %{}) do
     <<_serialization_version, rest :: binary>> = data
 
@@ -75,15 +75,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     case :small_ints.decode_zigzag_varint(data) do
       {0, rest} ->
-        # Remember to return `rest` and not `data` since `rest` doesn't contain
-        # the 0 byte that signals the end of the header, while `data` does.
         {Enum.reverse(acc), rest}
       {i, rest} when i < 0 ->
         case decode_property_definition(rest, i, schema) do
-          {field, rest} ->
-            decode_header(rest, schema, [field|acc])
-          :unknown_property_id ->
-            :unknown_property_id
+          {field, rest}        -> decode_header(rest, schema, [field|acc])
+          :unknown_property_id -> :unknown_property_id
         end
       {i, _} when i > 0 ->
         {field, rest} = decode_field_definition(data)
@@ -205,7 +201,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(<<cluster_id :: 32, position :: 32, rest :: binary>>, :link, _) do
-    {%MarcoPolo.RID{cluster_id: cluster_id, position: position}, rest}
+    {%RID{cluster_id: cluster_id, position: position}, rest}
   end
 
   def decode_type(data, :link_list, _) do
@@ -280,7 +276,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [Enum.reverse(fields), 0, Enum.reverse(values)]
   end
 
-  # Returns the length of the header based on the list of fields.
   defp header_offset(fields) do
     # The last +1 is for the `0` that signals the end of the header.
     fields
@@ -303,10 +298,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   defp encode_field_for_header(name, ptr, value) do
     type = infer_type(value)
-
-    if is_atom(name) do
-      name = Atom.to_string(name)
-    end
+    name = to_string(name)
 
     if is_nil(value) do
       ptr = 0
@@ -316,16 +308,15 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [encode_value(name), <<ptr :: 32-signed>>, type_to_int(type)]
   end
 
+  # Encodes a value inferring its type.
+  # Made public for testing.
   @doc false
   def encode_value(value, offset \\ 0)
 
-  def encode_value({type, value}, offset) do
-    encode_type(value, type, offset)
-  end
-
-  def encode_value(value, offset) do
-    encode_type(value, infer_type(value), offset)
-  end
+  def encode_value({type, value}, offset),
+    do: encode_type(value, type, offset)
+  def encode_value(value, offset),
+    do: encode_type(value, infer_type(value), offset)
 
   defp encode_type(value, type, offset)
 
@@ -398,7 +389,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [nkeys, keys, values]
   end
 
-  defp encode_type(%MarcoPolo.RID{cluster_id: id, position: pos}, :link, _offset) do
+  defp encode_type(%RID{cluster_id: id, position: pos}, :link, _offset) do
     <<id :: 32, pos :: 32>>
   end
 
@@ -436,11 +427,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     byte_size(nkeys) + Enum.sum(key_lengths)
   end
 
-  defp infer_type(value)
-
   defp infer_type(%HashSet{}),               do: :embedded_set
-  defp infer_type(%Document{}),      do: :embedded
-  defp infer_type(%MarcoPolo.RID{}),         do: :link
+  defp infer_type(%Document{}),              do: :embedded
+  defp infer_type(%RID{}),                   do: :link
   defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
   defp infer_type(%Decimal{}),               do: :decimal
   defp infer_type(val) when is_boolean(val), do: :boolean
@@ -450,7 +439,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(val) when is_list(val),    do: :embedded_list
   defp infer_type(val) when is_map(val),     do: :embedded_map
   defp infer_type(val) when is_nil(val),     do: :boolean # irrelevant
-  defp infer_type({type, _value}), do: type
 
   # http://orientdb.com/docs/last/Types.html
   @types [
