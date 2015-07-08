@@ -4,8 +4,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   require Record
 
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
-  Record.defrecordp :typed_field, [:value, :type]
-
   Record.defrecordp :field_def, [:name, :ptr, :type]
 
   @doc """
