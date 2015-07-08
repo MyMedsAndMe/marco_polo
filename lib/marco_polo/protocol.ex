@@ -145,11 +145,11 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
-  def parse_header(@ok <> <<sid :: int, rest :: binary>>),
+  defp parse_header(@ok <> <<sid :: int, rest :: binary>>),
     do: {:ok, sid, rest}
-  def parse_header(@error <> <<sid :: int, rest :: binary>>),
+  defp parse_header(@error <> <<sid :: int, rest :: binary>>),
     do: {:error, sid, rest}
-  def parse_header(_),
+  defp parse_header(_),
     do: :incomplete
 
   defp parse_errors(data) do
