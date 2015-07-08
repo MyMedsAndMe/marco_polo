@@ -21,7 +21,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   @spec decode(binary, Dict.t) :: MarcoPolo.Record.t
   def decode(data, schema \\ %{}) do
     <<_serialization_version, rest :: binary>> = data
-    decode_embedded(rest, schema)
+
+    case decode_embedded(rest, schema) do
+      {record, <<>>}       -> record
+      :unknown_property_id -> :unknown_property_id
+    end
   end
 
   @doc """

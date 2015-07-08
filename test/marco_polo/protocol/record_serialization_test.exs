@@ -11,12 +11,12 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   @record_no_fields <<0,           # version
                       10, "Klass", # class name
                       0,           # end of (empty) header
-                      "rest">>
+                      >>
 
   @record_no_fields_null_class <<0, # version
                                  0, # -1 with zigzag
                                  0, # end of (empty) header
-                                 "rest">>
+                                 >>
 
   @record_with_fields <<0,            # version
                         6, "foo",     # class name
@@ -29,7 +29,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                         0,            # end of header
                         12, "world!", # field value
                         24,           # field value (int with zigzag)
-                        "rest">>
+                        >>
 
   @record_with_property <<0,
                           6, "foo",
@@ -37,7 +37,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                           0, 0, 0, 25,
                           0,
                           10, "value",
-                          "rest">>
+                          >>
 
   @list <<4,            # number of items (zigzag, hence 2)
           23,           # type of the elems in the list, OrientDB only supports ANY
@@ -51,25 +51,25 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   ## Decoding
 
-  test "decode_embedded/2: record with no fields" do
+  test "decode/2: record with no fields" do
     assert Ser.decode(@record_no_fields) ==
-           {%Record{class: "Klass", fields: %{}}, "rest"}
+           %Record{class: "Klass", fields: %{}}
   end
 
-  test "decode_embedded/2: record with no fields and null class" do
+  test "decode/2: record with no fields and null class" do
     assert Ser.decode(@record_no_fields_null_class) ==
-           {%Record{class: nil}, "rest"}
+           %Record{class: nil}
   end
 
-  test "decode_embedded/2: record with fields" do
+  test "decode/2: record with fields" do
     record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
-    assert Ser.decode(@record_with_fields) == {record, "rest"}
+    assert Ser.decode(@record_with_fields) == record
   end
 
-  test "decode_embedded/2: record with properties" do
+  test "decode/2: record with properties" do
     record = %Record{class: "foo", fields: %{"prop" => "value"}}
     schema = %{global_properties: %{0 => {"prop", "STRING"}}}
-    assert Ser.decode(@record_with_property, schema) == {record, "rest"}
+    assert Ser.decode(@record_with_property, schema) == record
   end
 
   test "decode_type/2: simple types" do
@@ -108,7 +108,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     # Embedded documents have no serialization version
     <<_version, record :: bytes>> = @record_with_fields
 
-    assert decode_type(record, :embedded) ==
+    assert decode_type(record <> "rest", :embedded) ==
            {%Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
   end
 
@@ -224,13 +224,13 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   test "encode_value/1: embedded document with no fields" do
     record = %Record{class: "Klass"}
     <<_version, record_content :: binary>> = @record_no_fields
-    assert bin(encode_value(record)) <> "rest" == record_content
+    assert bin(encode_value(record)) == record_content
   end
 
   test "encode_value/1: embedded document with fields" do
     record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
     <<_version, record_content :: binary>> = @record_with_fields
-    assert bin(encode_value(record)) <> "rest" == record_content
+    assert bin(encode_value(record)) == record_content
   end
 
   test "encode_value/1: embedded lists" do

@@ -229,13 +229,11 @@ defmodule MarcoPolo.Protocol do
     case GP.parse(rest, parsers) do
       {[_type, version, record_content], rest} ->
         case RecordSerialization.decode(record_content, schema) do
-          {record, <<>>} ->
-            record = %{record | version: version}
-            parse_resp_to_record_load(rest, [record|acc], schema)
-          {_record, _} ->
-            raise "serialized record had more data than expected"
           :unknown_property_id ->
             {:unknown_property_id, rest}
+          record ->
+            record = %{record | version: version}
+            parse_resp_to_record_load(rest, [record|acc], schema)
         end
       :incomplete ->
         :incomplete
@@ -315,11 +313,11 @@ defmodule MarcoPolo.Protocol do
     case GP.parse(rest, parsers) do
       {[_record_type, _cluster_id, _cluster_pos, version, record_content], rest} ->
         case RecordSerialization.decode(record_content, schema) do
-          {record, <<>>} ->
-            record = %{record | version: version}
-            {record, rest}
           :unknown_property_id ->
             {:unknown_property_id, rest}
+          record ->
+            record = %{record | version: version}
+            {record, rest}
         end
       :incomplete ->
         :incomplete
