@@ -17,8 +17,10 @@ defmodule MarcoPolo.QueryParser do
   @spec query_type(binary) :: :sql_query | :sql_command
   def query_type(query) do
     case parse(query) do
-      "select" -> :sql_query
-      _        -> :sql_command
+      cmd when cmd in ["select", "traverse"] ->
+        :sql_query
+      _ ->
+        :sql_command
     end
   end
 
