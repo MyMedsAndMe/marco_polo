@@ -2,7 +2,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   use ExUnit.Case, async: true
 
   alias MarcoPolo.RID
-  alias MarcoPolo.Record
+  alias MarcoPolo.Document
   alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
@@ -53,21 +53,21 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "decode/2: record with no fields" do
     assert Ser.decode(@record_no_fields) ==
-           %Record{class: "Klass", fields: %{}}
+           %Document{class: "Klass", fields: %{}}
   end
 
   test "decode/2: record with no fields and null class" do
     assert Ser.decode(@record_no_fields_null_class) ==
-           %Record{class: nil}
+           %Document{class: nil}
   end
 
   test "decode/2: record with fields" do
-    record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
+    record = %Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
     assert Ser.decode(@record_with_fields) == record
   end
 
   test "decode/2: record with properties" do
-    record = %Record{class: "foo", fields: %{"prop" => "value"}}
+    record = %Document{class: "foo", fields: %{"prop" => "value"}}
     schema = %{global_properties: %{0 => {"prop", "STRING"}}}
     assert Ser.decode(@record_with_property, schema) == record
   end
@@ -109,7 +109,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     <<_version, record :: bytes>> = @record_with_fields
 
     assert decode_type(record <> "rest", :embedded) ==
-           {%Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
+           {%Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
   end
 
   test "decode_type/2: embedded lists" do
@@ -222,13 +222,13 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "encode_value/1: embedded document with no fields" do
-    record = %Record{class: "Klass"}
+    record = %Document{class: "Klass"}
     <<_version, record_content :: binary>> = @record_no_fields
     assert bin(encode_value(record)) == record_content
   end
 
   test "encode_value/1: embedded document with fields" do
-    record = %Record{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
+    record = %Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
     <<_version, record_content :: binary>> = @record_with_fields
     assert bin(encode_value(record)) == record_content
   end

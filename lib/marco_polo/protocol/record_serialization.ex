@@ -1,6 +1,9 @@
 defmodule MarcoPolo.Protocol.RecordSerialization do
   @moduledoc false
 
+  alias MarcoPolo.Document
+  alias MarcoPolo.RID
+
   require Record
 
   Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
@@ -40,8 +43,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       decode(encode(record)) = record
 
   """
-  @spec encode(MarcoPolo.Record.t) :: iodata
-  def encode(%MarcoPolo.Record{} = record) do
+  @spec encode(Document.t) :: iodata
+  def encode(%Document{} = record) do
     # 0 is the serialization version (as a byte), not the record version.
     [0, encode_embedded(record, 1)]
   end
@@ -60,7 +63,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
           class_name = nil
         end
 
-        {%MarcoPolo.Record{class: class_name, fields: fields}, rest}
+        {%Document{class: class_name, fields: fields}, rest}
       :unknown_property_id ->
         :unknown_property_id
     end
@@ -289,7 +292,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     |> +(1)
   end
 
-  defp encode_embedded(%MarcoPolo.Record{class: class, fields: fields}, offset) do
+  defp encode_embedded(%Document{class: class, fields: fields}, offset) do
     if is_nil(class) do
       class = ""
     end
@@ -438,7 +441,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(value)
 
   defp infer_type(%HashSet{}),               do: :embedded_set
-  defp infer_type(%MarcoPolo.Record{}),      do: :embedded
+  defp infer_type(%Document{}),      do: :embedded
   defp infer_type(%MarcoPolo.RID{}),         do: :link
   defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
   defp infer_type(%Decimal{}),               do: :decimal

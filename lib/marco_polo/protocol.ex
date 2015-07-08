@@ -19,7 +19,7 @@ defmodule MarcoPolo.Protocol do
     | {:int, integer}
     | {:long, integer}
     | {:raw, binary}
-    | MarcoPolo.Record.t
+    | MarcoPolo.Document.t
 
   @type sid :: non_neg_integer
   @type op_code :: non_neg_integer
@@ -63,7 +63,7 @@ defmodule MarcoPolo.Protocol do
   def encode_term({:raw, bytes}) when is_binary(bytes) or is_list(bytes), do: bytes
 
   # An entire record.
-  def encode_term(%MarcoPolo.Record{} = record), do: encode_term(RecordSerialization.encode(record))
+  def encode_term(%MarcoPolo.Document{} = record), do: encode_term(RecordSerialization.encode(record))
 
   def parse_connection_resp(data, connection_op) do
     parse_resp(connection_op, data, nil)

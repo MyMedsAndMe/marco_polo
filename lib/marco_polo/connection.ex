@@ -4,7 +4,7 @@ defmodule MarcoPolo.Connection do
   require Logger
 
   alias MarcoPolo.Protocol
-  alias MarcoPolo.Record
+  alias MarcoPolo.Document
   alias MarcoPolo.Error
   import MarcoPolo.Protocol.BinaryHelpers
 
@@ -235,9 +235,9 @@ defmodule MarcoPolo.Connection do
     end
   end
 
-  defp parse_schema(%Record{fields: %{"globalProperties" => properties}}) do
+  defp parse_schema(%Document{fields: %{"globalProperties" => properties}}) do
     global_properties =
-      for %Record{fields: %{"name" => name, "type" => type, "id" => id}} <- properties,
+      for %Document{fields: %{"name" => name, "type" => type, "id" => id}} <- properties,
         into: HashDict.new() do
           {id, {name, type}}
       end

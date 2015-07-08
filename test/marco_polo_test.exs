@@ -2,7 +2,7 @@ defmodule MarcoPoloTest do
   use ExUnit.Case, async: true
 
   alias MarcoPolo.Error
-  alias MarcoPolo.Record
+  alias MarcoPolo.Document
 
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
@@ -90,7 +90,7 @@ defmodule MarcoPoloTest do
 
       {:ok, [record]} = MarcoPolo.load_record(c, rid, "*:-1")
 
-      assert %MarcoPolo.Record{} = record
+      assert %Document{} = record
       assert record.version == 1
       assert record.class   == "Schemaless"
       assert record.fields  == %{"name" => "record_load"}
@@ -122,7 +122,7 @@ defmodule MarcoPoloTest do
 
     test "create_record/3", %{conn: c} do
       cluster_id = TestHelpers.cluster_id("schemaless")
-      record = %Record{class: "Schemaless", fields: %{"foo" => "bar"}}
+      record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
 
       {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
 
@@ -134,7 +134,7 @@ defmodule MarcoPoloTest do
       {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
 
       assert Enum.find(records, fn record ->
-        assert %Record{} = record
+        assert %Document{} = record
         assert record.class == "Schemaless"
 
         record.fields["name"] == "record_load"
@@ -145,7 +145,7 @@ defmodule MarcoPoloTest do
       cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
       res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
 
-      assert {:ok, [%Record{} = record]} = res
+      assert {:ok, [%Document{} = record]} = res
       assert record.fields["name"] == "record_load"
     end
 
@@ -154,7 +154,7 @@ defmodule MarcoPoloTest do
       params = %{"name" => "record_load"}
       res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
 
-      assert {:ok, [%Record{} = record]} = res
+      assert {:ok, [%Document{} = record]} = res
       assert record.fields["name"] == "record_load"
     end
 
@@ -199,7 +199,7 @@ defmodule MarcoPoloTest do
 
       :ok = MarcoPolo.fetch_schema(c)
 
-      assert {:ok, %Record{} = record} = command(c, insert_query)
+      assert {:ok, %Document{} = record} = command(c, insert_query)
       assert record.class   == "UnknownPropertyId"
       assert record.version == 1
       assert record.fields  == %{"i" => 30}
@@ -217,7 +217,7 @@ defmodule MarcoPoloTest do
       assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
 
       {:ok, records} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
-      records = Enum.map(records, fn(%Record{fields: %{"foo" => value}}) -> value end)
+      records = Enum.map(records, fn(%Document{fields: %{"foo" => value}}) -> value end)
 
       assert records == ~w(test1 test2 test3)
     end

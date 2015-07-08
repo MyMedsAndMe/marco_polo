@@ -1,7 +1,7 @@
 defmodule MarcoPolo do
   alias MarcoPolo.Connection, as: C
   alias MarcoPolo.RID
-  alias MarcoPolo.Record
+  alias MarcoPolo.Document
   alias MarcoPolo.Protocol
 
   @default_opts [
@@ -144,7 +144,7 @@ defmodule MarcoPolo do
   Creates a record in the database to which `conn` is connected.
 
   `cluster_id` specifies the cluster to create the record in, while `record` is
-  the `MarcoPolo.Record` struct representing the record to create.
+  the `MarcoPolo.Document` struct representing the record to create.
 
   The return value in case of success is `{:ok, {rid, version}}` where `rid` is
   the rid of the newly created record and `version` is the version of the newly
@@ -152,12 +152,12 @@ defmodule MarcoPolo do
 
   ## Examples
 
-      iex> record = %MarcoPolo.Record{class: "MyClass", fields: %{"foo" => "bar"}}
+      iex> record = %MarcoPolo.Document{class: "MyClass", fields: %{"foo" => "bar"}}
       iex> MarcoPolo.create_record(conn, 15, record)
       {:ok, {%MarcoPolo.RID{cluster_id: 15, position: 10}, 1}}
 
   """
-  @spec create_record(pid, non_neg_integer, Record.t) ::
+  @spec create_record(pid, non_neg_integer, Document.t) ::
     {:ok, {RID.t, non_neg_integer}}
   def create_record(conn, cluster_id, record) do
     args = [{:short, cluster_id}, record, {:raw, "d"}, {:raw, <<0>>}]
@@ -198,7 +198,7 @@ defmodule MarcoPolo do
       %{"foo" => "bar"}
 
   """
-  @spec load_record(pid, RID.t, String.t, Keyword.t) :: {:ok, [Record.t]}
+  @spec load_record(pid, RID.t, String.t, Keyword.t) :: {:ok, [Document.t]}
   def load_record(conn, %RID{} = rid, fetch_plan, opts \\ []) do
     {op, args} =
       if opts[:if_version_not_latest] do
@@ -337,7 +337,7 @@ defmodule MarcoPolo do
     args = [query,
             -1,
             Keyword.fetch!(opts, :fetch_plan),
-            %Record{class: nil, fields: %{"params" => params}}]
+            %Document{class: nil, fields: %{"params" => params}}]
 
     Protocol.encode_list_of_terms(args)
   end
@@ -346,7 +346,7 @@ defmodule MarcoPolo do
     args = [query]
 
     if params = opts[:params] do
-      params = %Record{class: nil, fields: %{"parameters" => params}}
+      params = %Document{class: nil, fields: %{"parameters" => params}}
       # `true` means "use simple parameters".
       args = args ++ [true, params]
     else
