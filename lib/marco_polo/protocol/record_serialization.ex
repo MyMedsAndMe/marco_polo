@@ -5,8 +5,6 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   alias MarcoPolo.RID
 
   require Record
-
-  Record.defrecordp :map_key, [:key, :data_type, :data_ptr]
   Record.defrecordp :field, [:name, :ptr, :type]
 
   @doc """
