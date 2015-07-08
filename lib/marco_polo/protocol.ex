@@ -22,10 +22,6 @@ defmodule MarcoPolo.Protocol do
     | {:raw, binary}
     | MarcoPolo.Document.t
 
-  @type sid :: non_neg_integer
-  @type op_code :: non_neg_integer
-  @type op_name :: atom
-
   @ok    <<0>>
   @error <<1>>
 
