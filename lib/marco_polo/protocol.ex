@@ -118,6 +118,15 @@ defmodule MarcoPolo.Protocol do
     parse_resp(connection_op, data, nil)
   end
 
+  @doc """
+  Parses the response to a given operation.
+
+  `op_name` (the name of the operation as an atom, like `:record_load`) is used
+  to determine the structure of the response. `schema` is passed down to the
+  record deserialization (in case there are records) in order to decode possible
+  property ids.
+  """
+  @spec parse_resp(atom, binary, Dict.t) :: :ok
   def parse_resp(op_name, data, schema) do
     case parse_header(data) do
       :incomplete ->
@@ -131,23 +140,24 @@ defmodule MarcoPolo.Protocol do
           :incomplete ->
             :incomplete
         end
-      {:error, rest} ->
-        case parse_errors(rest, []) do
-          {errors, rest} ->
-            {:error, Error.from_errors(errors), rest}
-          :incomplete ->
-            :incomplete
-        end
+      {:error, _sid, rest} ->
+        parse_errors(rest)
     end
   end
 
   def parse_header(@ok <> <<sid :: int, rest :: binary>>),
     do: {:ok, sid, rest}
-  def parse_header(@error <> <<_sid :: int, rest :: binary>>),
-    do: {:error, rest}
+  def parse_header(@error <> <<sid :: int, rest :: binary>>),
+    do: {:error, sid, rest}
   def parse_header(_),
     do: :incomplete
 
+  defp parse_errors(data) do
+    case parse_errors(data, []) do
+      {errors, rest} -> {:error, Error.from_errors(errors), rest}
+      :incomplete    -> :incomplete
+    end
+  end
 
   defp parse_errors(<<1, rest :: binary>>, acc) do
     case GP.parse(rest, [&decode_term(&1, :string), &decode_term(&1, :string)]) do
@@ -157,10 +167,9 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_errors(<<0, rest :: binary>>, acc) do
-    # What am I supposed to do with a Java binary dump of the exception?! :(
     case decode_term(rest, :bytes) do
-      {_dump, rest} -> {Enum.reverse(acc), rest}
-      :incomplete   -> :incomplete
+      {_exception_dump, rest} -> {Enum.reverse(acc), rest}
+      :incomplete             -> :incomplete
     end
   end
 
