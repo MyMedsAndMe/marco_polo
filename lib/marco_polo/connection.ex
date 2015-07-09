@@ -80,6 +80,19 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def disconnect(error, s) do
+    # We only care about {_, from} tuples, ignoring queued stuff like
+    # :fetch_schema.
+    for {_operation, from} <- :queue.to_list(s.queue) do
+      Connection.reply(from, error)
+    end
+
+    # Backoff 0 to churn through all commands in mailbox before reconnecting,
+    # https://github.com/ericmj/mongodb/blob/a2dba1dfc089960d87364c2c43892f3061a93924/lib/mongo/connection.ex#L210
+    {:backoff, 0, %{s | socket: nil, queue: :queue.new}}
+  end
+
+  @doc false
   def handle_call(call, from, s)
 
   # No socket means there's no TCP connection, we can return an error to the
