@@ -3,6 +3,8 @@ defmodule MarcoPolo.Protocol do
 
   require Integer
 
+  import MarcoPolo.Protocol.BinaryHelpers
+
   alias MarcoPolo.GenericParser, as: GP
   alias MarcoPolo.Error
   alias MarcoPolo.Document

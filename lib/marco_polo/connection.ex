@@ -9,8 +9,6 @@ defmodule MarcoPolo.Connection do
   alias MarcoPolo.Protocol
   alias MarcoPolo.Document
   alias MarcoPolo.Error
-  import MarcoPolo.Protocol.BinaryHelpers
-
 
   @socket_opts [:binary, active: false, packet: :raw]
 
