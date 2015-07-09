@@ -12,11 +12,13 @@ defmodule MarcoPolo.Connection do
 
   @socket_opts [:binary, active: false, packet: :raw]
 
-  @initial_state %{socket: nil,
-                   session_id: nil,
-                   queue: :queue.new,
-                   schema: nil,
-                   tail: ""}
+  @initial_state %{
+    socket: nil,
+    session_id: nil,
+    queue: :queue.new,
+    schema: nil,
+    tail: "",
+  }
 
   ## Client code.
 
