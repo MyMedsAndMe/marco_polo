@@ -148,13 +148,7 @@ defmodule MarcoPolo.Connection do
   end
 
   def handle_info({:tcp_closed, socket}, %{socket: socket} = s) do
-    Logger.error "TCP closed"
-    {:noreply, s}
-  end
-
-  def handle_info(msg, s) do
-    IO.puts "Received unhandled message: #{inspect msg}"
-    {:noreply, s}
+    {:disconnect, {:error, :closed}, s}
   end
 
   # Helper functions.
