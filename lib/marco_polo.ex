@@ -249,12 +249,47 @@ defmodule MarcoPolo do
   @doc """
   Execute the given `query` in the database to which `conn` is connected.
 
-  `opts` is a list of options that depend on the kind of command being issued.
+  OrientDB makes a distinction between idempotent queries and non-idempotent
+  queries (it calls the former *queries* and the latter *commands*). In order to
+  provide a clean interface for performing operations on the server, `MarcoPolo`
+  provides only a `command/3` function both for idempotent as well as
+  non-idempotent operations. Whether an operation is idempotent is inferred by
+  the text in `query`. As of now, `SELECT` and `TRAVERSE` operations are
+  idempotent while all other operations are non-idempotent.
 
-  If `query` is an *idempotent* command (`SELECT`), then the options are:
+  The options that this function accepts depend in part on the type of the operation.
+
+  The options shared by both idempotent and non-idempotent operations are the following:
+
+    * `:params` - a map of params with atoms or strings as keys and any
+      encodable term as values. These parameters are used by OrientDB to build
+      prepared statements as you can see in the examples below. Defaults to `%{}`.
+
+  The additional options for idempotent (e.g., `SELECT`) queries are:
 
     * `:fetch_plan`: a string specifying the fetch plan. Mandatory for `SELECT`
       queries.
+
+  ## Examples
+
+  The following is an example of an idempotent command:
+
+      iex> opts = [params: %{name: "jennifer"}, fetch_plan: "*:-1"]
+      iex> query = "SELECT FROM User WHERE name = :name AND age > 18"
+      iex> {:ok, %MarcoPolo.Document{} = doc} = MarcoPolo.command(conn, query, opts)
+      iex> doc.fields["name"]
+      "jennifer"
+      iex> doc.fields["age"]
+      45
+
+  The following is an example of a non-idempotent command:
+
+      iex> query = "INSERT INTO User(name) VALUES ('meg', 'abed')"
+      iex> {:ok, [meg, abed]} = MarcoPolo.command(conn, query)
+      iex> meg.fields["name"]
+      "meg"
+      iex> abed.fields["name"]
+      "abed"
 
   """
   @spec command(pid, String.t, Keyword.t) :: term
