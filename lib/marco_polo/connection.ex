@@ -79,9 +79,9 @@ defmodule MarcoPolo.Connection do
 
   @doc false
   def disconnect(error, s) do
-    # We only care about {_, from} tuples, ignoring queued stuff like
+    # We only care about {from, _} tuples, ignoring queued stuff like
     # :fetch_schema.
-    for {_operation, from} <- :queue.to_list(s.queue) do
+    for {from, _operation} <- :queue.to_list(s.queue) do
       Connection.reply(from, error)
     end
 
@@ -99,13 +99,13 @@ defmodule MarcoPolo.Connection do
     {:reply, {:error, :closed}, s}
   end
 
-  def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
+  def handle_call({:operation, op_name, args}, from, s) do
     req = Protocol.encode_op(op_name, [sid|args])
     send_noreply_enqueueing(s, req, {from, op_name})
   end
 
   @doc false
-  def handle_cast(:fetch_schema, %{session_id: sid} = s) do
+  def handle_cast(:fetch_schema, s) do
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
@@ -117,35 +117,7 @@ defmodule MarcoPolo.Connection do
 
   def handle_info({:tcp, socket, msg}, %{session_id: sid, socket: socket} = s) do
     :inet.setopts(socket, active: :once)
-    data = s.tail <> msg
-
-    s =
-      case :queue.out(s.queue) do
-        {{:value, :fetch_schema}, new_queue} ->
-          case Protocol.parse_resp(:record_load, data, s.schema) do
-            :incomplete ->
-              %{s | tail: data}
-            {:error, %Error{}, _} ->
-              raise "couldn't fetch schema"
-            {:ok, ^sid, [resp], rest} ->
-              %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
-          end
-        {{:value, {from, op_name}}, new_queue} ->
-          case Protocol.parse_resp(op_name, data, s.schema) do
-            :incomplete ->
-              %{s | tail: data}
-            {:unknown_property_id, rest} ->
-              Connection.reply(from, {:error, :unknown_property_id})
-              %{s | tail: rest}
-            {:error, error, rest} ->
-              Connection.reply(from, {:error, error})
-              %{s | tail: rest, queue: new_queue}
-            {:ok, ^sid, resp, rest} ->
-              Connection.reply(from, {:ok, resp})
-              %{s | tail: rest, queue: new_queue}
-          end
-      end
-
+    s = dequeue_and_parse_resp(s, :queue.out(s.queue), s.tail <> msg)
     {:noreply, s}
   end
 
@@ -186,5 +158,36 @@ defmodule MarcoPolo.Connection do
 
   defp enqueue(s, what) do
     update_in s.queue, &:queue.in(what, &1)
+  end
+
+  defp dequeue_and_parse_resp(s, {{:value, :fetch_schema}, new_queue}, data) do
+    sid = s.session_id
+
+    case Protocol.parse_resp(:record_load, data, s.schema) do
+      :incomplete ->
+        %{s | tail: data}
+      {:error, %Error{}, _} ->
+        raise "couldn't fetch schema"
+      {:ok, ^sid, [resp], rest} ->
+        %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
+    end
+  end
+
+  defp dequeue_and_parse_resp(s, {{:value, {from, op_name}}, new_queue}, data) do
+    sid = s.session_id
+
+    case Protocol.parse_resp(op_name, data, s.schema) do
+      :incomplete ->
+        %{s | tail: data}
+      {:unknown_property_id, rest} ->
+        Connection.reply(from, {:error, :unknown_property_id})
+        %{s | tail: rest}
+      {:error, error, rest} ->
+        Connection.reply(from, {:error, error})
+        %{s | tail: rest, queue: new_queue}
+      {:ok, ^sid, resp, rest} ->
+        Connection.reply(from, {:ok, resp})
+        %{s | tail: rest, queue: new_queue}
+    end
   end
 end
