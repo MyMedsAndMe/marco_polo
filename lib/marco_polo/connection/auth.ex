@@ -4,6 +4,8 @@ defmodule MarcoPolo.Connection.Auth do
   import MarcoPolo.Protocol.BinaryHelpers
   alias MarcoPolo.Protocol
 
+  @typep state :: Map.t
+
   @protocol 30
 
   @connection_args [
@@ -15,6 +17,13 @@ defmodule MarcoPolo.Connection.Auth do
     false,                               # token-based auth, not supported
   ]
 
+  @doc """
+  Authenticate to the OrientDB server to perform server or database operations.
+
+  The type of connection (ultimately distinguishing between REQUEST_CONNECT and
+  REQUEST_DB_OPEN) is stored in `opts[:connection]`, which is required.
+  """
+  @spec connect(state) :: {:ok, state} | {:error, term, state} | {:tcp_error, term, state}
   def connect(s) do
     case negotiate_protocol(s) do
       :ok                  -> authenticate(s)
@@ -23,8 +32,6 @@ defmodule MarcoPolo.Connection.Auth do
   end
 
   defp negotiate_protocol(%{socket: socket}) do
-    supported = Application.get_env(:marco_polo, :supported_protocol)
-
     case :gen_tcp.recv(socket, 2) do
       {:ok, <<_protocol :: short>>} ->
         # TODO decide a protocol support policy, which will most likely be
