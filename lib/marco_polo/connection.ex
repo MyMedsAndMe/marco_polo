@@ -101,13 +101,13 @@ defmodule MarcoPolo.Connection do
     {:reply, {:error, :closed}, s}
   end
 
-  def handle_call({:operation, op_name, args}, from, s) do
+  def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
     req = Protocol.encode_op(op_name, [sid|args])
     send_noreply_enqueueing(s, req, {from, op_name})
   end
 
   @doc false
-  def handle_cast(:fetch_schema, s) do
+  def handle_cast(:fetch_schema, %{session_id: sid} = s) do
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
@@ -117,7 +117,7 @@ defmodule MarcoPolo.Connection do
   @doc false
   def handle_info(msg, state)
 
-  def handle_info({:tcp, socket, msg}, %{session_id: sid, socket: socket} = s) do
+  def handle_info({:tcp, socket, msg}, %{socket: socket} = s) do
     :inet.setopts(socket, active: :once)
     s = dequeue_and_parse_resp(s, :queue.out(s.queue), s.tail <> msg)
     {:noreply, s}
