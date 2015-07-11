@@ -19,7 +19,7 @@ defmodule MarcoPoloMiscTest do
     class = "WorkingWithLists"
 
     {:ok, [cluster_id]} = command(c, "CREATE CLASS #{class}")
-    {:ok, _}          = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
+    {:ok, _}            = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
     fetch_schema(c)
 
@@ -44,5 +44,22 @@ defmodule MarcoPoloMiscTest do
     assert %{"nested" => nested} = loaded_doc.fields
     assert %{"doc" => %Document{} = nested_doc} = nested
     assert nested_doc.fields["foo"] == "bar"
+  end
+
+  test "creating and deleting a record using no_response operations", %{conn: c} do
+    cluster_id = TestHelpers.cluster_id("schemaless")
+    query = "SELECT FROM Schemaless WHERE name = 'no response ops'"
+    fields = %{"foo" => "bar", "name" => "no response ops"}
+    doc = %Document{class: "Schemaless", fields: fields}
+
+    assert :ok = create_record(c, cluster_id, doc, no_response: true)
+
+    {:ok, [loaded_doc]} = command(c, query, fetch_plan: "*:-1")
+
+    assert loaded_doc.class == "Schemaless"
+    assert loaded_doc.fields == fields
+
+    assert :ok = delete_record(c, loaded_doc.rid, loaded_doc.version, no_response: true)
+    assert {:ok, []} = command(c, query, fetch_plan: "*:-1")
   end
 end

@@ -9,6 +9,11 @@ defmodule MarcoPolo do
     port: 2424,
   ]
 
+  @request_modes %{
+    sync: {:raw, <<0>>},
+    no_response: {:raw, <<2>>},
+  }
+
   @doc """
   Starts the connection with an OrientDB server.
 
@@ -166,12 +171,12 @@ defmodule MarcoPolo do
   @spec create_record(pid, non_neg_integer, Document.t, Keyword.t) ::
     {:ok, {RID.t, non_neg_integer}}
   def create_record(conn, cluster_id, record, opts \\ []) do
-    args = [{:short, cluster_id}, record, {:raw, "d"}, {:raw, <<0>>}]
+    args = [{:short, cluster_id}, record, {:raw, "d"}]
 
     if opts[:no_response] do
-      C.no_response_operation(conn, :record_create, args)
+      C.no_response_operation(conn, :record_create, args ++ [@request_modes.no_response])
     else
-      case C.operation(conn, :record_create, args) do
+      case C.operation(conn, :record_create, args ++ [@request_modes.sync]) do
         {:ok, [cluster_id, position, version]} ->
           rid = %RID{cluster_id: cluster_id, position: position}
           {:ok, {rid, version}}
@@ -246,14 +251,17 @@ defmodule MarcoPolo do
       {:ok, true}
 
   """
-  @spec delete_record(pid, RID.t, non_neg_integer) :: {:ok, boolean}
-  def delete_record(conn, %RID{} = rid, version) do
+  @spec delete_record(pid, RID.t, non_neg_integer, Keyword.t) :: {:ok, boolean}
+  def delete_record(conn, %RID{} = rid, version, opts \\ []) do
     args = [{:short, rid.cluster_id},
             {:long, rid.position},
-            {:int, version},
-            {:raw, <<0>>}]
+            {:int, version}]
 
-    C.operation(conn, :record_delete, args)
+    if opts[:no_response] do
+      C.no_response_operation(conn, :record_delete, args ++ [@request_modes.no_response])
+    else
+      C.operation(conn, :record_delete, args ++ [@request_modes.sync])
+    end
   end
 
   @doc """
