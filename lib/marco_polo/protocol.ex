@@ -231,7 +231,7 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(data, parsers) do
       {[cluster_id, position, version, _], rest} ->
-        {[cluster_id, position, version], rest}
+        {{%RID{cluster_id: cluster_id, position: position}, version}, rest}
       :incomplete ->
         :incomplete
     end

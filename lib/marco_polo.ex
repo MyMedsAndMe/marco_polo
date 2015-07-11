@@ -176,13 +176,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_create, args ++ [@request_modes.no_response])
     else
-      case C.operation(conn, :record_create, args ++ [@request_modes.sync]) do
-        {:ok, [cluster_id, position, version]} ->
-          rid = %RID{cluster_id: cluster_id, position: position}
-          {:ok, {rid, version}}
-        o ->
-          o
-      end
+      C.operation(conn, :record_create, args ++ [@request_modes.sync])
     end
   end
 
