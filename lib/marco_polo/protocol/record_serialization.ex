@@ -442,35 +442,35 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   # http://orientdb.com/docs/last/Types.html
   @types [
-    boolean: 0,
-    int: 1,
-    short: 2,
-    long: 3,
-    float: 4,
-    double: 5,
-    datetime: 6,
-    string: 7,
-    binary: 8,
-    embedded: 9,
-    embedded_list: 10,
-    embedded_set: 11,
-    embedded_map: 12,
-    link: 13,
-    link_list: 14,
-    link_set: 15,
-    link_map: 16,
-    byte: 17,
-    transient: 18,
-    date: 19,
-    custom: 20,
-    decimal: 21,
-    link_bag: 22,
-    any: 23,
+    {:boolean, "BOOLEAN", 0},
+    {:int, "INT", 1},
+    {:short, "SHORT", 2},
+    {:long, "LONG", 3},
+    {:float, "FLOAT", 4},
+    {:double, "DOUBLE", 5},
+    {:datetime, "DATETIME", 6},
+    {:string, "STRING", 7},
+    {:binary, "BINARY", 8},
+    {:embedded, "EMBEDDED", 9},
+    {:embedded_list, "EMBEDDEDLIST", 10},
+    {:embedded_set, "EMBEDDEDSET", 11},
+    {:embedded_map, "EMBEDDEDMAP", 12},
+    {:link, "LINK", 13},
+    {:link_list, "LINKLIST", 14},
+    {:link_set, "LINKSET", 15},
+    {:link_map, "LINKMAP", 16},
+    {:byte, "BYTE", 17},
+    {:transient, "TRANSIENT", 18},
+    {:date, "DATE", 19},
+    {:custom, "CUSTOM", 20},
+    {:decimal, "DECIMAL", 21},
+    {:link_bag, "LINKBAG", 22},
+    {:any, "ANY", 23},
   ]
 
-  for {type_name, type_id} <- @types do
-    defp int_to_type(unquote(type_id)), do: unquote(type_name)
-    defp type_to_int(unquote(type_name)), do: unquote(type_id)
-    defp string_to_type(unquote(type_name |> Atom.to_string |> String.upcase)), do: unquote(type_name)
+  for {type_name, stringified_type, type_id} <- @types do
+    defp int_to_type(unquote(type_id)),             do: unquote(type_name)
+    defp type_to_int(unquote(type_name)),           do: unquote(type_id)
+    defp string_to_type(unquote(stringified_type)), do: unquote(type_name)
   end
 end
