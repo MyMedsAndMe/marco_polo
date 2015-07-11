@@ -18,12 +18,10 @@ defmodule MarcoPoloMiscTest do
   test "working with embedded lists in schemaful classes", %{conn: c} do
     class = "WorkingWithLists"
 
-    {:ok, cluster_id} = command(c, "CREATE CLASS #{class}")
+    {:ok, [cluster_id]} = command(c, "CREATE CLASS #{class}")
     {:ok, _}          = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
     fetch_schema(c)
-
-    cluster_id = String.to_integer(cluster_id)
 
     doc = %Document{class: class, fields: %{"l" => [1, "foo", 3.14]}}
 

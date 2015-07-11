@@ -10,6 +10,7 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.Document
   alias MarcoPolo.RID
   alias MarcoPolo.Protocol.RecordSerialization
+  alias MarcoPolo.Protocol.CSVTypes
 
   @type encodable_term ::
     boolean
@@ -309,7 +310,7 @@ defmodule MarcoPolo.Protocol do
     case GP.parse(rest, [&decode_term(&1, :bytes), &decode_term(&1, :byte)]) do
       # TODO find out why OrientDB shoves a 0 byte at the end of this binary
       # dump, not mentioned in the docs :(
-      {[binary, 0], rest} -> {binary, rest}
+      {[binary, 0], rest} -> {CSVTypes.decode(binary), rest}
       :incomplete         -> :incomplete
     end
   end

@@ -270,6 +270,13 @@ defmodule MarcoPolo do
     * `:fetch_plan`: a string specifying the fetch plan. Mandatory for `SELECT`
       queries.
 
+  If the query is successful then the return value is an `{:ok, values}` tuple
+  where `values` strictly depends on the performed query. Usually, `values` is a
+  list of results. For example, when a `CREATE CLUSTER` command is executed,
+  `{:ok, [cluster_id]}` is returned where `cluster_id` is the id of the newly
+  created cluster.
+  query.
+
   ## Examples
 
   The following is an example of an idempotent command:

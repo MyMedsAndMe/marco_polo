@@ -170,21 +170,19 @@ defmodule MarcoPoloTest do
       cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
       params = %{"name" => "record_update", "f" => "new_value"}
 
-      # TODO the response is a binary dump with "1" in it, not sure what that
-      # means.
-      assert {:ok, "1"} = MarcoPolo.command(c, cmd, params: params)
+      assert {:ok, [1]} = MarcoPolo.command(c, cmd, params: params)
     end
 
     test "command/3: miscellaneous commands", %{conn: c} do
       import MarcoPolo, only: [command: 2, command: 3]
 
-      assert {:ok, _cluster} = command(c, "CREATE CLUSTER misc_tests")
-      assert {:ok, _cluster} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
-      assert {:ok, _unknown} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
-      assert {:ok, nil}      = command(c, "DROP PROPERTY MiscTests.foo")
-      assert {:ok, "true"}   = command(c, "DROP CLASS MiscTests")
-      assert {:ok, "true"}   = command(c, "DROP CLUSTER misc_tests")
-      assert {:ok, "false"}  = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, [_cluster_id]}  = command(c, "CREATE CLUSTER misc_tests")
+      assert {:ok, _}              = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+      assert {:ok, [_property_id]} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
+      assert {:ok, nil}            = command(c, "DROP PROPERTY MiscTests.foo")
+      assert {:ok, [true]}         = command(c, "DROP CLASS MiscTests")
+      assert {:ok, [true]}         = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, [false]}        = command(c, "DROP CLUSTER misc_tests")
     end
 
     test "command/3 and fetch_schema/1: unknown property id", %{conn: c} do
