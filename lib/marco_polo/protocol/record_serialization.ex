@@ -439,6 +439,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(val) when is_list(val),    do: :embedded_list
   defp infer_type(val) when is_map(val),     do: :embedded_map
   defp infer_type(val) when is_nil(val),     do: :boolean # irrelevant
+  defp infer_type({type, _}),                do: type
 
   # http://orientdb.com/docs/last/Types.html
   @types [
