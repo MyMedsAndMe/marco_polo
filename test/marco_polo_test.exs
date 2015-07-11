@@ -137,6 +137,14 @@ defmodule MarcoPoloTest do
       :ok = MarcoPolo.create_record(c, cluster_id, record, no_response: true)
     end
 
+    test "update_record/6", %{conn: c} do
+      rid = TestHelpers.record_rid("record_update")
+      new_doc = %Document{class: "Schemaless", fields: %{f: "bar"}}
+
+      assert {:ok, new_version} = MarcoPolo.update_record(c, rid, 1, new_doc, true)
+      assert is_integer(new_version)
+    end
+
     test "command/3: SELECT query without a WHERE clause", %{conn: c} do
       {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
 
@@ -171,13 +179,6 @@ defmodule MarcoPoloTest do
       assert {:ok, [r1, r2]} = MarcoPolo.command(c, cmd)
       assert r1.fields["my_field"] == "value1"
       assert r2.fields["my_field"] == "value2"
-    end
-
-    test "command/3: UPDATE query with parameters", %{conn: c} do
-      cmd = "UPDATE Schemaless SET f = :f WHERE name = :name"
-      params = %{"name" => "record_update", "f" => "new_value"}
-
-      assert {:ok, [1]} = MarcoPolo.command(c, cmd, params: params)
     end
 
     test "command/3: miscellaneous commands", %{conn: c} do

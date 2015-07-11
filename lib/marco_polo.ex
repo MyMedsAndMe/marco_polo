@@ -232,6 +232,51 @@ defmodule MarcoPolo do
   end
 
   @doc """
+  Updates the given record in the databse to which `conn` is connected.
+
+  The record to update is identified by its `rid`; `version` is the version to
+  update. `new_record` is the updated record. `update_content?` can be:
+
+    * `true` - the content of the record has been changed and should be updated
+      in the storage.
+    * `false` - the record was modified but its own content has not changed:
+      related collections (e.g. RidBags) have to be updated, but the record
+      version and its contents should not be updated.
+
+  When the update is successful, `{:ok, new_version}` is returned.
+
+  This function accepts the following options:
+
+    * `:no_response` - if `true`, send the request to the OrientDB server
+      without waiting for a response. This performs a *fire and forget*
+      operation, returning `:ok` every time.
+
+  ## Examples
+
+      iex> rid = %MarcoPolo.RID{cluster_id: 1, position: 10}
+      iex> new_record = %MarcoPolo.Document{class: "MyClass", fields: %{foo: "new value"}}
+      iex> MarcoPolo.update_record(conn, rid, 1, new_record, true)
+      {:ok, 2}
+
+  """
+  @spec update_record(pid, RID.t, non_neg_integer, Document.t, boolean, Keyword.t) ::
+    {:ok, non_neg_integer}
+  def update_record(conn, %RID{} = rid, version, new_record, update_content?, opts \\ []) do
+    args = [{:short, rid.cluster_id},
+            {:long, rid.position},
+            update_content?,
+            new_record,
+            version,
+            {:raw, "d"}]
+
+    if opts[:no_response] do
+      C.no_response_operation(conn, :record_update, args ++ [@request_modes.no_response])
+    else
+      C.operation(conn, :record_update, args ++ [@request_modes.sync])
+    end
+  end
+
+  @doc """
   Deletes a record from the database to which `conn` is connected.
 
   The record to delete is identified by `rid`; version `version` is

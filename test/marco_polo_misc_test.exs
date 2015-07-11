@@ -31,6 +31,21 @@ defmodule MarcoPoloMiscTest do
     assert loaded_doc.fields == doc.fields
   end
 
+  test "creating and then updating a record", %{conn: c} do
+    cmd = "INSERT INTO Schemaless(name, f) VALUES ('create and update', 'foo')"
+    {:ok, %Document{} = doc} = command(c, cmd)
+
+    assert doc.fields == %{"name" => "create and update", "f" => "foo"}
+
+    cmd = "UPDATE Schemaless SET f = 'bar' WHERE name = 'create and update'"
+    {:ok, [new_version]} = command(c, cmd)
+
+    {:ok, [new_doc]} = load_record(c, doc.rid, "*:-1")
+
+    assert new_doc.fields["f"] == "bar"
+    assert is_integer(new_version)
+  end
+
   test "working with nested embedded docs in schemaless classes", %{conn: c} do
     cluster_id = TestHelpers.cluster_id("schemaless")
 

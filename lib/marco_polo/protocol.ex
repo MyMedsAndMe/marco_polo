@@ -237,6 +237,18 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
+  defp parse_resp_contents(:record_update, data, _) do
+    parsers = [
+      &decode_term(&1, :int), # version
+      &parse_collection_changes/1,
+    ]
+
+    case GP.parse(data, parsers) do
+      {[version, _], rest} -> {version, rest}
+      :incomplete          -> :incomplete
+    end
+  end
+
   defp parse_resp_contents(:record_delete, data, _) do
     case decode_term(data, :byte) do
       {0, rest}   -> {false, rest}
