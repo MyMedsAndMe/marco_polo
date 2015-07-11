@@ -120,7 +120,7 @@ defmodule MarcoPoloTest do
       assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
     end
 
-    test "create_record/3", %{conn: c} do
+    test "create_record/3: creating a record synchronously", %{conn: c} do
       cluster_id = TestHelpers.cluster_id("schemaless")
       record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
 
@@ -128,6 +128,13 @@ defmodule MarcoPoloTest do
 
       assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
       assert is_integer(version)
+    end
+
+    test "create_record/3: using the :no_response option", %{conn: c} do
+      cluster_id = TestHelpers.cluster_id("schemaless")
+      record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
+
+      :ok = MarcoPolo.create_record(c, cluster_id, record, no_response: true)
     end
 
     test "command/3: SELECT query without a WHERE clause", %{conn: c} do

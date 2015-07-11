@@ -36,6 +36,10 @@ defmodule MarcoPolo.Connection do
     Connection.call(pid, {:operation, op_name, args})
   end
 
+  def no_response_operation(pid, op_name, args) do
+    Connection.cast(pid, {:operation, op_name, args})
+  end
+
   def fetch_schema(pid) do
     Connection.cast(pid, :fetch_schema)
   end
@@ -107,6 +111,11 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
+    req = Protocol.encode_op(op_name, [sid|args])
+    send_noreply(s, req)
+  end
+
   def handle_cast(:fetch_schema, %{session_id: sid} = s) do
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
@@ -155,6 +164,13 @@ defmodule MarcoPolo.Connection do
         {:noreply, enqueue(s, to_enqueue)}
       {:error, _reason} = error ->
         {:disconnect, error, s}
+    end
+  end
+
+  defp send_noreply(%{socket: socket} = s, req) do
+    case :gen_tcp.send(socket, req) do
+      :ok                       -> {:noreply, s}
+      {:error, _reason} = error -> {:disconnect, error, s}
     end
   end
 
