@@ -97,8 +97,6 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
-  def handle_call(call, from, s)
-
   # No socket means there's no TCP connection, we can return an error to the
   # client.
   def handle_call(_call, _from, %{socket: nil} = s) do
@@ -128,8 +126,6 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
-  def handle_info(msg, state)
-
   def handle_info({:tcp, socket, msg}, %{socket: socket} = s) do
     :inet.setopts(socket, active: :once)
     s = dequeue_and_parse_resp(s, :queue.out(s.queue), s.tail <> msg)
