@@ -414,6 +414,9 @@ defmodule MarcoPolo.Protocol do
   defp req_code(:command),                           do: 41
   defp req_code(:positions_ceiling),                 do: 42
   defp req_code(:tx_commit),                         do: 60
+  defp req_code(:index_get),                         do: 60
+  defp req_code(:index_put),                         do: 60
+  defp req_code(:index_remove),                      do: 60
   defp req_code(:db_reload),                         do: 73
   defp req_code(:push_record),                       do: 79
   defp req_code(:push_distrib_config),               do: 80
