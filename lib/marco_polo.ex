@@ -410,26 +410,6 @@ defmodule MarcoPolo do
     operation_and_maybe_refetch_schema(conn, :command, args)
   end
 
-  @doc """
-  Tells the connection (`conn`) to re-fetch the schema of the OrientDB database.
-
-  This is usually used when an `:unknown_property_id` error is returned in orded
-  to fetch the schema again and make all the new properties available.
-
-  This function operates as a "cast" (*fire and forget*) operation, so it
-  returns `:ok` right away.
-
-  ## Examples
-
-      iex> MarcoPolo.fetch_schema(conn)
-      :ok
-
-  """
-  @spec fetch_schema(pid) :: :ok
-  def fetch_schema(conn) do
-    C.fetch_schema(conn)
-  end
-
   defp encode_query_with_type(:sql_query, query, opts) do
     params = opts[:params] || %{}
     args = [query,
