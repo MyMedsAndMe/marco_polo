@@ -107,7 +107,9 @@ defmodule MarcoPolo.Connection do
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
     req = Protocol.encode_op(op_name, [sid|args])
-    send_noreply_enqueueing(s, req, {from, op_name})
+    s
+    |> enqueue({from, op_name})
+    |> send_noreply(req)
   end
 
   @doc false
@@ -120,7 +122,9 @@ defmodule MarcoPolo.Connection do
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
-    send_noreply_enqueueing(s, req, :fetch_schema)
+    s
+    |> enqueue(:fetch_schema)
+    |> send_noreply(req)
   end
 
   @doc false
@@ -156,15 +160,6 @@ defmodule MarcoPolo.Connection do
   defp setup_socket_buffers(socket) do
     {:ok, [sndbuf: sndbuf, recbuf: recbuf]} = :inet.getopts(socket, [:sndbuf, :recbuf])
     :ok = :inet.setopts(socket, [buffer: max(sndbuf, recbuf)])
-  end
-
-  defp send_noreply_enqueueing(%{socket: socket} = s, req, to_enqueue) do
-    case :gen_tcp.send(socket, req) do
-      :ok ->
-        {:noreply, enqueue(s, to_enqueue)}
-      {:error, _reason} = error ->
-        {:disconnect, error, s}
-    end
   end
 
   defp send_noreply(%{socket: socket} = s, req) do
