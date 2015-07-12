@@ -1,5 +1,6 @@
 defmodule MarcoPoloMiscTest do
   use ExUnit.Case, async: true
+  @moduletag :integration
 
   import MarcoPolo
   alias MarcoPolo.Document

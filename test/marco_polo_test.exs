@@ -1,5 +1,6 @@
 defmodule MarcoPoloTest do
   use ExUnit.Case, async: true
+  @moduletag :integration
 
   alias MarcoPolo.Error
   alias MarcoPolo.Document
@@ -18,6 +19,7 @@ defmodule MarcoPoloTest do
 
   defmodule ConnectedToServer do
     use ExUnit.Case, async: true
+    @moduletag :integration
 
     setup do
       {:ok, conn} = MarcoPolo.start_link(
@@ -60,6 +62,7 @@ defmodule MarcoPoloTest do
 
   defmodule ConnectedToDb do
     use ExUnit.Case, async: true
+    @moduletag :integration
 
     setup do
       {:ok, conn} = MarcoPolo.start_link(
