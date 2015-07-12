@@ -124,24 +124,27 @@ defmodule MarcoPolo.Protocol do
   record deserialization (in case there are records) in order to decode possible
   property ids.
   """
-  @spec parse_resp(atom, binary, Dict.t) :: :ok
+  @spec parse_resp(atom, binary, Dict.t) ::
+    {sid :: non_neg_integer, resp :: term, rest :: binary} | :incomplete
   def parse_resp(op_name, data, schema) do
     case parse_header(data) do
       :incomplete ->
         :incomplete
       {:ok, sid, rest} ->
         case parse_resp_contents(op_name, rest, schema) do
-          {:unknown_property_id, rest} ->
-            {:error, sid, :unknown_property_id, rest}
-          {resp, rest} ->
-            {:ok, sid, resp, rest}
           :incomplete ->
             :incomplete
+          {:unknown_property_id, rest} ->
+            {sid, {:error, :unknown_property_id}, rest}
+          {resp, rest} ->
+            {sid, {:ok, resp}, rest}
         end
       {:error, sid, rest} ->
         case parse_errors(rest) do
-          {error, rest} -> {:error, sid, error, rest}
-          :incomplete   -> :incomplete
+          :incomplete ->
+            :incomplete
+          {error, rest} ->
+            {sid, {:error, error}, rest}
         end
     end
   end

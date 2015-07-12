@@ -72,9 +72,9 @@ defmodule MarcoPolo.Connection.Auth do
         case Protocol.parse_connection_resp(data, connection_type) do
           :incomplete ->
             wait_for_connection_response(%{s | tail: data}, connection_type)
-          {:error, error, rest} ->
-            {:error, error, %{s | tail: rest}}
-          {:ok, -1, [sid, _token], rest} ->
+          {-1, {:error, err}, rest} ->
+            {:error, err, %{s | tail: rest}}
+          {-1, {:ok, [sid, _token]}, rest} ->
             {:ok, %{s | session_id: sid, tail: rest}}
         end
     end

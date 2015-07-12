@@ -92,7 +92,8 @@ defmodule MarcoPolo.ProtocolTest do
              3 :: int, <<1, 2, 3>>,             # binary dump of the exception
              "rest">>
 
-    assert {:error, _sid, %Error{} = err, "rest"} = Protocol.parse_resp(:foo, data, %{})
+
+    assert {_sid, {:error, %Error{} = err}, "rest"} = Protocol.parse_resp(:foo, data, %{})
     assert err.errors == [{"foo", "bar"}, {"baz", "bong"}]
   end
 end

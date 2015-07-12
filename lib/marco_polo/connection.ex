@@ -184,10 +184,10 @@ defmodule MarcoPolo.Connection do
     case Protocol.parse_resp(:record_load, data, s.schema) do
       :incomplete ->
         %{s | tail: data}
-      {:error, ^sid, %Error{}, _} ->
+      {^sid, {:error, _}, _rest} ->
         raise "couldn't fetch schema"
-      {:ok, ^sid, [resp], rest} ->
-        %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
+      {^sid, {:ok, [schema]}, rest} ->
+        %{s | schema: parse_schema(schema), tail: rest, queue: new_queue}
     end
   end
 
@@ -197,14 +197,8 @@ defmodule MarcoPolo.Connection do
     case Protocol.parse_resp(op_name, data, s.schema) do
       :incomplete ->
         %{s | tail: data}
-      {:unknown_property_id, rest} ->
-        Connection.reply(from, {:error, :unknown_property_id})
-        %{s | tail: rest}
-      {:error, ^sid, error, rest} ->
-        Connection.reply(from, {:error, error})
-        %{s | tail: rest, queue: new_queue}
-      {:ok, ^sid, resp, rest} ->
-        Connection.reply(from, {:ok, resp})
+      {^sid, resp, rest} ->
+        Connection.reply(from, resp)
         %{s | tail: rest, queue: new_queue}
     end
   end
