@@ -22,8 +22,6 @@ defmodule MarcoPoloMiscTest do
     {:ok, [cluster_id]} = command(c, "CREATE CLASS #{class}")
     {:ok, _}            = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
-    fetch_schema(c)
-
     doc = %Document{class: class, fields: %{"l" => [1, "foo", 3.14]}}
 
     assert {:ok, {%RID{} = rid, _version}} = create_record(c, cluster_id, doc)
@@ -77,5 +75,18 @@ defmodule MarcoPoloMiscTest do
 
     assert :ok = delete_record(c, loaded_doc.rid, loaded_doc.version, no_response: true)
     assert {:ok, []} = command(c, query, fetch_plan: "*:-1")
+  end
+
+  test "unknown property ids are handled automatically", %{conn: c} do
+    import MarcoPolo, only: [command: 2, command: 3]
+
+    {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
+    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
+
+    insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
+    assert {:ok, %Document{} = record} = command(c, insert_query)
+    assert record.class   == "UnknownPropertyId"
+    assert record.version == 1
+    assert record.fields  == %{"i" => 30}
   end
 end

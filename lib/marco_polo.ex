@@ -176,7 +176,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_create, args ++ [@request_modes.no_response])
     else
-      C.operation(conn, :record_create, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn, :record_create, args ++ [@request_modes.sync])
     end
   end
 
@@ -227,8 +227,7 @@ defmodule MarcoPolo do
         {:record_load, args}
       end
 
-
-    C.operation(conn, op, args)
+    operation_and_maybe_refetch_schema(conn, op, args)
   end
 
   @doc """
@@ -272,7 +271,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_update, args ++ [@request_modes.no_response])
     else
-      C.operation(conn, :record_update, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn, :record_update, args ++ [@request_modes.sync])
     end
   end
 
@@ -299,7 +298,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_delete, args ++ [@request_modes.no_response])
     else
-      C.operation(conn, :record_delete, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn, :record_delete, args ++ [@request_modes.sync])
     end
   end
 
@@ -375,7 +374,7 @@ defmodule MarcoPolo do
             {:raw, command_class_name},
             {:raw, payload}]
 
-    C.operation(conn, :command, args)
+    operation_and_maybe_refetch_schema(conn, :command, args)
   end
 
   @doc """
@@ -408,7 +407,7 @@ defmodule MarcoPolo do
             {:raw, command_class_name},
             {:raw, payload}]
 
-    C.operation(conn, :command, args)
+    operation_and_maybe_refetch_schema(conn, :command, args)
   end
 
   @doc """
@@ -455,5 +454,15 @@ defmodule MarcoPolo do
     args = args ++ [false]
 
     Protocol.encode_list_of_terms(args)
+  end
+
+  defp operation_and_maybe_refetch_schema(conn, op, args) do
+    case C.operation(conn, op, args) do
+      {:error, :unknown_property_id} ->
+        C.fetch_schema(conn)
+        C.operation(conn, op, args)
+      o ->
+        o
+    end
   end
 end

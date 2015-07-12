@@ -196,24 +196,6 @@ defmodule MarcoPoloTest do
       assert {:ok, [false]}        = command(c, "DROP CLUSTER misc_tests")
     end
 
-    test "command/3 and fetch_schema/1: unknown property id", %{conn: c} do
-      import MarcoPolo, only: [command: 2, command: 3]
-
-      insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
-
-      {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
-      {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
-
-      assert {:error, :unknown_property_id} = command(c, insert_query)
-
-      :ok = MarcoPolo.fetch_schema(c)
-
-      assert {:ok, %Document{} = record} = command(c, insert_query)
-      assert record.class   == "UnknownPropertyId"
-      assert record.version == 1
-      assert record.fields  == %{"i" => 30}
-    end
-
     test "script/4", %{conn: c} do
       script = """
       db.command('CREATE CLASS ScriptTest');
