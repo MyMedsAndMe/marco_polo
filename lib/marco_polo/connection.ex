@@ -22,6 +22,11 @@ defmodule MarcoPolo.Connection do
 
   ## Client code.
 
+  @doc """
+  Starts the current `Connection`. If the (successful) connection is to a
+  database, fetch the schema.
+  """
+  @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts) do
     case Connection.start_link(__MODULE__, opts) do
       {:error, _} = err ->
@@ -32,14 +37,29 @@ defmodule MarcoPolo.Connection do
     end
   end
 
+  @doc """
+  Performs the operation identified by `op_name` with the connection on
+  `pid`. `args` is the list of arguments to pass to the operation.
+  """
   def operation(pid, op_name, args) do
     Connection.call(pid, {:operation, op_name, args})
   end
 
+  @doc """
+  Does what `operation/3` does but expects no response from OrientDB and always
+  returns `:ok`.
+  """
+  @spec no_response_operation(pid, atom, [term]) :: :ok
   def no_response_operation(pid, op_name, args) do
     Connection.cast(pid, {:operation, op_name, args})
   end
 
+  @doc """
+  Fetch the schema and store it into the state.
+
+  Always returns `:ok` without waiting for the schema to be fetched.
+  """
+  @spec fetch_schema(pid) :: :ok
   def fetch_schema(pid) do
     Connection.cast(pid, :fetch_schema)
   end
