@@ -184,7 +184,7 @@ defmodule MarcoPolo.Connection do
     case Protocol.parse_resp(:record_load, data, s.schema) do
       :incomplete ->
         %{s | tail: data}
-      {:error, %Error{}, _} ->
+      {:error, ^sid, %Error{}, _} ->
         raise "couldn't fetch schema"
       {:ok, ^sid, [resp], rest} ->
         %{s | schema: parse_schema(resp), tail: rest, queue: new_queue}
@@ -200,7 +200,7 @@ defmodule MarcoPolo.Connection do
       {:unknown_property_id, rest} ->
         Connection.reply(from, {:error, :unknown_property_id})
         %{s | tail: rest}
-      {:error, error, rest} ->
+      {:error, ^sid, error, rest} ->
         Connection.reply(from, {:error, error})
         %{s | tail: rest, queue: new_queue}
       {:ok, ^sid, resp, rest} ->

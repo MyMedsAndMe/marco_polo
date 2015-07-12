@@ -132,14 +132,17 @@ defmodule MarcoPolo.Protocol do
       {:ok, sid, rest} ->
         case parse_resp_contents(op_name, rest, schema) do
           {:unknown_property_id, rest} ->
-            {:error, :unknown_property_id, rest}
+            {:error, sid, :unknown_property_id, rest}
           {resp, rest} ->
             {:ok, sid, resp, rest}
           :incomplete ->
             :incomplete
         end
-      {:error, _sid, rest} ->
-        parse_errors(rest)
+      {:error, sid, rest} ->
+        case parse_errors(rest) do
+          {error, rest} -> {:error, sid, error, rest}
+          :incomplete   -> :incomplete
+        end
     end
   end
 
@@ -152,7 +155,7 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_errors(data) do
     case parse_errors(data, []) do
-      {errors, rest} -> {:error, Error.from_errors(errors), rest}
+      {errors, rest} -> {Error.from_errors(errors), rest}
       :incomplete    -> :incomplete
     end
   end
