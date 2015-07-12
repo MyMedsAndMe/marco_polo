@@ -6,7 +6,10 @@ records  = []
 run_script = fn(script) ->
   case System.cmd("orientdb-console", [script], stderr_to_stdout: true) do
     {lines, 0}   -> lines
-    {_, _status} -> raise "Database setup in test/test_helper.exs failed"
+    {err, _status} -> raise """
+    Database setup in test/test_helper.exs failed:
+    #{err}
+    """
   end
 end
 
