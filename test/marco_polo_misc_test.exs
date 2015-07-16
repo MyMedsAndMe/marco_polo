@@ -26,7 +26,7 @@ defmodule MarcoPoloMiscTest do
 
     assert {:ok, {%RID{} = rid, _version}} = create_record(c, cluster_id, doc)
 
-    assert {:ok, [loaded_doc]} = load_record(c, rid, "*:-1")
+    assert {:ok, [loaded_doc]} = load_record(c, rid)
     assert loaded_doc.fields == doc.fields
   end
 
@@ -39,7 +39,7 @@ defmodule MarcoPoloMiscTest do
     cmd = "UPDATE Schemaless SET f = 'bar' WHERE name = 'create and update'"
     {:ok, new_version} = command(c, cmd)
 
-    {:ok, [new_doc]} = load_record(c, doc.rid, "*:-1")
+    {:ok, [new_doc]} = load_record(c, doc.rid)
 
     assert new_doc.fields["f"] == "bar"
     assert is_integer(new_version)
@@ -53,7 +53,7 @@ defmodule MarcoPoloMiscTest do
     }}
 
     {:ok, {rid, _vsn}}  = create_record(c, cluster_id, doc)
-    {:ok, [loaded_doc]} = load_record(c, rid, "*:-1")
+    {:ok, [loaded_doc]} = load_record(c, rid)
 
     assert %{"nested" => nested} = loaded_doc.fields
     assert %{"doc" => %Document{} = nested_doc} = nested

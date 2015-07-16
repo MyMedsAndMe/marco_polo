@@ -9,6 +9,8 @@ defmodule MarcoPolo do
     port: 2424,
   ]
 
+  @default_fetch_plan "*:0"
+
   @request_modes %{
     sync: {:raw, <<0>>},
     no_response: {:raw, <<2>>},
@@ -212,21 +214,21 @@ defmodule MarcoPolo do
       %{"foo" => "bar"}
 
   """
-  @spec load_record(pid, RID.t, String.t, Keyword.t) :: {:ok, [Document.t]}
-  def load_record(conn, %RID{} = rid, fetch_plan, opts \\ []) do
+  @spec load_record(pid, RID.t, Keyword.t) :: {:ok, [Document.t]}
+  def load_record(conn, %RID{} = rid, opts \\ []) do
     {op, args} =
       if opts[:if_version_not_latest] do
         args = [{:short, rid.cluster_id},
                 {:long, rid.position},
                 {:int, Keyword.fetch!(opts, :version)},
-                fetch_plan,
+                opts[:fetch_plan] || @default_fetch_plan,
                 opts[:ignore_cache] || true,
                 opts[:load_tombstones] || false]
         {:record_load_if_version_not_latest, args}
       else
         args = [{:short, rid.cluster_id},
                 {:long, rid.position},
-                fetch_plan,
+                opts[:fetch_plan] || @default_fetch_plan,
                 opts[:ignore_cache] || true,
                 opts[:load_tombstones] || false]
         {:record_load, args}
@@ -429,7 +431,7 @@ defmodule MarcoPolo do
     params = opts[:params] || %{}
     args = [query,
             -1,
-            Keyword.fetch!(opts, :fetch_plan),
+            opts[:fetch_plan] || @default_fetch_plan,
             %Document{class: nil, fields: %{"params" => params}}]
 
     Protocol.encode_list_of_terms(args)
