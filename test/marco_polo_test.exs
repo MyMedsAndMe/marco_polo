@@ -4,6 +4,7 @@ defmodule MarcoPoloTest do
 
   alias MarcoPolo.Error
   alias MarcoPolo.Document
+  alias MarcoPolo.BinaryRecord
 
   test "start_link/1: not specifying a connection type raises an error" do
     msg = "no connection type (connect/db_open) specified"
@@ -88,7 +89,7 @@ defmodule MarcoPoloTest do
       assert is_integer(nrecords)
     end
 
-    test "load_record/4", %{conn: c} do
+    test "load_record/4: loading a document", %{conn: c} do
       rid = TestHelpers.record_rid("record_load")
 
       {:ok, [record]} = MarcoPolo.load_record(c, rid, fetch_plan: "*:-1")
@@ -123,9 +124,19 @@ defmodule MarcoPoloTest do
       assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
     end
 
-    test "create_record/3: creating a record synchronously", %{conn: c} do
+    test "create_record/3: creating a record (document) synchronously", %{conn: c} do
       cluster_id = TestHelpers.cluster_id("schemaless")
       record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
+
+      {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
+
+      assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
+      assert is_integer(version)
+    end
+
+    test "create_record/3: creating a record (blob) synchronously", %{conn: c} do
+      cluster_id = TestHelpers.cluster_id("schemaless")
+      record = %BinaryRecord{contents: <<84, 41>>}
 
       {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
 

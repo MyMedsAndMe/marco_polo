@@ -2,6 +2,7 @@ defmodule MarcoPolo do
   alias MarcoPolo.Connection, as: C
   alias MarcoPolo.RID
   alias MarcoPolo.Document
+  alias MarcoPolo.BinaryRecord
   alias MarcoPolo.Protocol
 
   @default_opts [
@@ -176,7 +177,7 @@ defmodule MarcoPolo do
   @spec create_record(pid, non_neg_integer, Document.t, Keyword.t) ::
     {:ok, {RID.t, non_neg_integer}}
   def create_record(conn, cluster_id, record, opts \\ []) do
-    args = [{:short, cluster_id}, record, {:raw, "d"}]
+    args = [{:short, cluster_id}, record, record_type(record)]
 
     if opts[:no_response] do
       C.no_response_operation(conn, :record_create, args ++ [@request_modes.no_response])
@@ -186,6 +187,9 @@ defmodule MarcoPolo do
       end
     end
   end
+
+  defp record_type(%Document{}), do: {:raw, "d"}
+  defp record_type(%BinaryRecord{}), do: {:raw, "b"}
 
   @doc """
   Loads a record from the database to which `conn` is connected.

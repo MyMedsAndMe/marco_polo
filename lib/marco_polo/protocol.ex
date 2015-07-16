@@ -8,6 +8,7 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.GenericParser, as: GP
   alias MarcoPolo.Error
   alias MarcoPolo.Document
+  alias MarcoPolo.BinaryRecord
   alias MarcoPolo.RID
   alias MarcoPolo.Protocol.RecordSerialization
   alias MarcoPolo.Protocol.CSVTypes
@@ -26,6 +27,9 @@ defmodule MarcoPolo.Protocol do
 
   @ok    <<0>>
   @error <<1>>
+
+  @document ?d
+  @binary_record ?b
 
   @doc """
   Encodes an operation given its name (`op_name`) and a list of arguments
@@ -79,8 +83,11 @@ defmodule MarcoPolo.Protocol do
   # Raw bytes (that have no leading length, just the bytes).
   def encode_term({:raw, bytes}) when is_binary(bytes) or is_list(bytes), do: bytes
 
-  # An entire record.
+  # An entire document.
   def encode_term(%Document{} = record), do: encode_term(RecordSerialization.encode(record))
+
+  # A binary record (BLOB).
+  def encode_term(%BinaryRecord{contents: bytes}), do: encode_term(bytes)
 
   @doc """
   Decodes an instance of `type` from `data`.
@@ -269,13 +276,13 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_to_record_load(<<1, rest :: binary>>, acc, schema) do
     parsers = [
-      &decode_term(&1, :byte),  # version
-      &decode_term(&1, :int),   # type
+      &decode_term(&1, :byte),  # type
+      &decode_term(&1, :int),   # version
       &decode_term(&1, :bytes), # contents
     ]
 
     case GP.parse(rest, parsers) do
-      {[_type, version, record_content], rest} ->
+      {[@document, version, record_content], rest} ->
         case RecordSerialization.decode(record_content, schema) do
           :unknown_property_id ->
             {:unknown_property_id, rest}
@@ -283,6 +290,9 @@ defmodule MarcoPolo.Protocol do
             record = %{record | version: version}
             parse_resp_to_record_load(rest, [record|acc], schema)
         end
+      {[@binary_record, version, content], rest} ->
+        record = %BinaryRecord{contents: content, version: version}
+        parse_resp_to_record_load(rest, [record|acc], schema)
       :incomplete ->
         :incomplete
     end

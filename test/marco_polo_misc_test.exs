@@ -4,6 +4,7 @@ defmodule MarcoPoloMiscTest do
 
   import MarcoPolo
   alias MarcoPolo.Document
+  alias MarcoPolo.BinaryRecord
   alias MarcoPolo.RID
 
   setup do
@@ -109,5 +110,14 @@ defmodule MarcoPoloMiscTest do
 
   test "expiring timeouts when performing operations", %{conn: c} do
     assert {:timeout, _} = catch_exit(command(c, "SELECT FROM Schemaless", fetch_plan: "*:0", timeout: 0))
+  end
+
+  test "creating and loading a binary record (blob)", %{conn: c} do
+    cluster_id = TestHelpers.cluster_id("schemaless")
+    blob = %BinaryRecord{contents: <<91, 23>>}
+
+    assert {:ok, {%RID{} = rid, _}} = create_record(c, cluster_id, blob)
+    assert {:ok, [%BinaryRecord{} = record]} = load_record(c, rid)
+    assert record.contents == <<91, 23>>
   end
 end

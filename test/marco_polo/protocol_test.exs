@@ -81,6 +81,11 @@ defmodule MarcoPolo.ProtocolTest do
     assert Protocol.decode_term(<<44 :: 24>>, :int) == :incomplete
   end
 
+  test "encode_term/1: binary records" do
+    rec = %MarcoPolo.BinaryRecord{contents: <<100, 2, 93>>}
+    assert Protocol.encode_term(rec) == <<3 :: 32, 100, 2, 93>>
+  end
+
   test "parse_resp/3: parsing error responses" do
     data = <<1,                                 # error response
              10 :: int,                         # sid
