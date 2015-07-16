@@ -87,4 +87,16 @@ defmodule MarcoPoloMiscTest do
     assert record.version == 1
     assert record.fields  == %{"i" => 30}
   end
+
+  test "index management", %{conn: c} do
+    assert {:ok, _} = command(c, "CREATE INDEX myIndex UNIQUE STRING")
+    assert {:ok, _} = command(c, "INSERT INTO index:myIndex (key,rid) VALUES ('foo',#0:1)")
+
+    # TODO this fails with a fetch plan of *:-1 (fails with a timeout).
+    query = "SELECT FROM index:myIndex WHERE key = 'foo'"
+    assert {:ok, [%Document{fields: %{"key" => "foo", "rid" => rid}}]}
+           = command(c, query, fetch_plan: "*:0")
+
+    assert rid == %RID{cluster_id: 0, position: 1}
+  end
 end
