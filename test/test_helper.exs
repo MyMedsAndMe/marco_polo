@@ -1,3 +1,7 @@
+# Ignore scripting tests by default as scripting must be enabled manually in the
+# OrientDB server configuration.
+ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ [:scripting])
+
 ExUnit.start()
 
 unless :integration in ExUnit.configuration[:exclude] do

@@ -196,6 +196,7 @@ defmodule MarcoPoloTest do
       assert {:ok, false} = command(c, "DROP CLUSTER misc_tests")
     end
 
+    @tag :scripting
     test "script/4", %{conn: c} do
       script = """
       db.command('CREATE CLASS ScriptTest');
