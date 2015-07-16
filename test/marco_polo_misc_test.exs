@@ -8,7 +8,7 @@ defmodule MarcoPoloMiscTest do
 
   setup do
     {:ok, conn} = MarcoPolo.start_link(
-      connection: {:db, "MarcoPoloTest", "plocal"},
+      connection: {:db, "MarcoPoloTest", "document"},
       user: TestHelpers.user(),
       password: TestHelpers.password()
     )
