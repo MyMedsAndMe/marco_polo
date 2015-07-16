@@ -1,6 +1,14 @@
 ExUnit.start()
 
 unless :integration in ExUnit.configuration[:exclude] do
+  case :gen_tcp.connect('localhost', 2424, []) do
+    {:ok, _} ->
+      :ok
+    {:error, reason} ->
+      msg = "Error connecting to OrientDB in test_helper.exs: #{:inet.format_error(reason)}"
+      IO.puts(:stderr, msg) && System.halt(1)
+  end
+
   clusters = []
   records  = []
 
