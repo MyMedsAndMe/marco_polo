@@ -99,4 +99,15 @@ defmodule MarcoPoloMiscTest do
 
     assert rid == %RID{cluster_id: 0, position: 1}
   end
+
+  test "expiring timeouts when connecting" do
+    assert {:error, :timeout} = start_link(connection: :server,
+                                           user: TestHelpers.user(),
+                                           password: TestHelpers.password(),
+                                           timeout: 0)
+  end
+
+  test "expiring timeouts when performing operations", %{conn: c} do
+    assert {:timeout, _} = catch_exit(command(c, "SELECT FROM Schemaless", fetch_plan: "*:0", timeout: 0))
+  end
 end

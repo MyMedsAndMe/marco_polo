@@ -8,6 +8,8 @@ defmodule MarcoPolo.Connection.Auth do
 
   @protocol 30
 
+  @timeout 5000
+
   @connection_args [
     "OrientDB binary driver for Elixir", # client name
     "0.0.1-beta",                        # client version
@@ -31,8 +33,8 @@ defmodule MarcoPolo.Connection.Auth do
     end
   end
 
-  defp negotiate_protocol(%{socket: socket}) do
-    case :gen_tcp.recv(socket, 2) do
+  defp negotiate_protocol(%{socket: socket, opts: opts}) do
+    case :gen_tcp.recv(socket, 2, opts[:timeout] || @timeout) do
       {:ok, <<_protocol :: short>>} ->
         # TODO decide a protocol support policy, which will most likely be
         # enforced here.
@@ -63,8 +65,8 @@ defmodule MarcoPolo.Connection.Auth do
   defp op_and_args_from_connection_type(user, password, {:db, name, type}),
     do: {:db_open, [name, type, user, password]}
 
-  defp wait_for_connection_response(%{socket: socket} = s, connection_type) do
-    case :gen_tcp.recv(socket, 0) do
+  defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
+    case :gen_tcp.recv(socket, 0, opts[:timeout] || @timeout) do
       {:error, reason} ->
         {:tcp_error, reason, s}
       {:ok, new_data} ->

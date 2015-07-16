@@ -12,6 +12,8 @@ defmodule MarcoPolo.Connection do
 
   @socket_opts [:binary, active: false, packet: :raw]
 
+  @timeout 5000
+
   @initial_state %{
     socket: nil,
     session_id: nil,
@@ -28,7 +30,10 @@ defmodule MarcoPolo.Connection do
   """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts) do
-    case Connection.start_link(__MODULE__, opts) do
+    # The first `opts` is the value to pass to the `init/1` callback, the second
+    # one is the list of options being passed to `Connection.start_link` (e.g.,
+    # `:name` or `:timeout`).
+    case Connection.start_link(__MODULE__, opts, opts) do
       {:error, _} = err ->
         err
       {:ok, pid} = res ->
@@ -41,8 +46,8 @@ defmodule MarcoPolo.Connection do
   Performs the operation identified by `op_name` with the connection on
   `pid`. `args` is the list of arguments to pass to the operation.
   """
-  def operation(pid, op_name, args) do
-    Connection.call(pid, {:operation, op_name, args})
+  def operation(pid, op_name, args, opts) do
+    Connection.call(pid, {:operation, op_name, args}, opts[:timeout] || @timeout)
   end
 
   @doc """
@@ -81,9 +86,9 @@ defmodule MarcoPolo.Connection do
 
   @doc false
   def connect(_info, s) do
-    {host, port, socket_opts} = tcp_connection_opts(s)
+    {host, port, socket_opts, timeout} = tcp_connection_opts(s)
 
-    case :gen_tcp.connect(host, port, socket_opts) do
+    case :gen_tcp.connect(host, port, socket_opts, timeout) do
       {:ok, socket} ->
         s = %{s | socket: socket}
         setup_socket_buffers(socket)
@@ -160,7 +165,7 @@ defmodule MarcoPolo.Connection do
 
   defp tcp_connection_opts(%{opts: opts} = _state) do
     socket_opts = @socket_opts ++ (opts[:socket_opts] || [])
-    {to_char_list(opts[:host]), opts[:port], socket_opts}
+    {to_char_list(opts[:host]), opts[:port], socket_opts, opts[:timeout] || @timeout}
   end
 
   defp parse_schema(%Document{fields: %{"globalProperties" => properties}}) do

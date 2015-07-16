@@ -14,6 +14,9 @@ defmodule MarcoPolo do
     no_response: {:raw, <<2>>},
   }
 
+  @type db_type :: :document | :graph
+  @type storage_type :: :plocal | :memory
+
   @doc """
   Starts the connection with an OrientDB server.
 
@@ -51,9 +54,9 @@ defmodule MarcoPolo do
       {:ok, true}
 
   """
-  @spec db_exists?(pid, String.t, String.t) :: {:ok, boolean}
-  def db_exists?(conn, name, type) do
-    C.operation(conn, :db_exist, [name, type])
+  @spec db_exists?(pid, String.t, String.t, Keyword.t) :: {:ok, boolean}
+  def db_exists?(conn, name, type, opts \\ []) do
+    C.operation(conn, :db_exist, [name, type], opts)
   end
 
   @doc """
@@ -66,8 +69,8 @@ defmodule MarcoPolo do
 
   """
   @spec db_reload(pid) :: :ok
-  def db_reload(conn) do
-    case C.operation(conn, :db_reload, []) do
+  def db_reload(conn, opts \\ []) do
+    case C.operation(conn, :db_reload, [], opts) do
       {:ok, _}            -> :ok
       {:error, _} = error -> error
     end
@@ -85,13 +88,13 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec create_db(pid, String.t, :document | :graph, :plocal | :memory) :: :ok
-  def create_db(conn, name, type, storage)
+  @spec create_db(pid, String.t, db_type, storage_type, Keyword.t) :: :ok
+  def create_db(conn, name, type, storage, opts \\ [])
       when type in [:document, :graph] and storage in [:plocal, :memory] do
     type    = Atom.to_string(type)
     storage = Atom.to_string(storage)
 
-    case C.operation(conn, :db_create, [name, type, storage]) do
+    case C.operation(conn, :db_create, [name, type, storage], opts) do
       {:ok, nil} -> :ok
       o          -> o
     end
@@ -109,9 +112,9 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec drop_db(pid, String.t, :plocal | :memory) :: :ok
-  def drop_db(conn, name, storage) when storage in [:plocal, :memory] do
-    case C.operation(conn, :db_drop, [name, Atom.to_string(storage)]) do
+  @spec drop_db(pid, String.t, storage_type, Keyword.t) :: :ok
+  def drop_db(conn, name, storage, opts \\ []) when storage in [:plocal, :memory] do
+    case C.operation(conn, :db_drop, [name, Atom.to_string(storage)], opts) do
       {:ok, nil} -> :ok
       o          -> o
     end
@@ -126,9 +129,9 @@ defmodule MarcoPolo do
       {:ok, 1158891}
 
   """
-  @spec db_size(pid) :: {:ok, non_neg_integer}
-  def db_size(conn) do
-    C.operation(conn, :db_size, [])
+  @spec db_size(pid, Keyword.t) :: {:ok, non_neg_integer}
+  def db_size(conn, opts \\ []) do
+    C.operation(conn, :db_size, [], opts)
   end
 
   @doc """
@@ -140,9 +143,9 @@ defmodule MarcoPolo do
       {:ok, 7931}
 
   """
-  @spec db_countrecords(pid) :: {:ok, non_neg_integer}
-  def db_countrecords(conn) do
-    C.operation(conn, :db_countrecords, [])
+  @spec db_countrecords(pid, Keyword.t) :: {:ok, non_neg_integer}
+  def db_countrecords(conn, opts \\ []) do
+    C.operation(conn, :db_countrecords, [], opts)
   end
 
   @doc """
@@ -176,7 +179,9 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_create, args ++ [@request_modes.no_response])
     else
-      operation_and_maybe_refetch_schema(conn, :record_create, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn,
+                                         :record_create, args ++ [@request_modes.sync],
+                                         opts)
     end
   end
 
@@ -227,7 +232,7 @@ defmodule MarcoPolo do
         {:record_load, args}
       end
 
-    operation_and_maybe_refetch_schema(conn, op, args)
+    operation_and_maybe_refetch_schema(conn, op, args, opts)
   end
 
   @doc """
@@ -271,7 +276,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_update, args ++ [@request_modes.no_response])
     else
-      operation_and_maybe_refetch_schema(conn, :record_update, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn, :record_update, args ++ [@request_modes.sync], opts)
     end
   end
 
@@ -298,7 +303,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_delete, args ++ [@request_modes.no_response])
     else
-      operation_and_maybe_refetch_schema(conn, :record_delete, args ++ [@request_modes.sync])
+      operation_and_maybe_refetch_schema(conn, :record_delete, args ++ [@request_modes.sync], opts)
     end
   end
 
@@ -374,7 +379,7 @@ defmodule MarcoPolo do
             {:raw, command_class_name},
             {:raw, payload}]
 
-    operation_and_maybe_refetch_schema(conn, :command, args)
+    operation_and_maybe_refetch_schema(conn, :command, args, opts)
   end
 
   @doc """
@@ -407,7 +412,7 @@ defmodule MarcoPolo do
             {:raw, command_class_name},
             {:raw, payload}]
 
-    operation_and_maybe_refetch_schema(conn, :command, args)
+    operation_and_maybe_refetch_schema(conn, :command, args, opts)
   end
 
   defp encode_query_with_type(:sql_query, query, opts) do
@@ -436,11 +441,11 @@ defmodule MarcoPolo do
     Protocol.encode_list_of_terms(args)
   end
 
-  defp operation_and_maybe_refetch_schema(conn, op, args) do
-    case C.operation(conn, op, args) do
+  defp operation_and_maybe_refetch_schema(conn, op, args, opts) do
+    case C.operation(conn, op, args, opts) do
       {:error, :unknown_property_id} ->
         C.fetch_schema(conn)
-        C.operation(conn, op, args)
+        C.operation(conn, op, args, opts)
       o ->
         o
     end
