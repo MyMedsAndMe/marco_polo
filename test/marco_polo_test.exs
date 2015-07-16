@@ -187,13 +187,13 @@ defmodule MarcoPoloTest do
     test "command/3: miscellaneous commands", %{conn: c} do
       import MarcoPolo, only: [command: 2, command: 3]
 
-      assert {:ok, [_cluster_id]}  = command(c, "CREATE CLUSTER misc_tests")
-      assert {:ok, _}              = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
-      assert {:ok, [_property_id]} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
-      assert {:ok, nil}            = command(c, "DROP PROPERTY MiscTests.foo")
-      assert {:ok, [true]}         = command(c, "DROP CLASS MiscTests")
-      assert {:ok, [true]}         = command(c, "DROP CLUSTER misc_tests")
-      assert {:ok, [false]}        = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, _cluster_id}  = command(c, "CREATE CLUSTER misc_tests")
+      assert {:ok, _} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+      assert {:ok, _property_id} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
+      assert {:ok, nil} = command(c, "DROP PROPERTY MiscTests.foo")
+      assert {:ok, true} = command(c, "DROP CLASS MiscTests")
+      assert {:ok, true} = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, false} = command(c, "DROP CLUSTER misc_tests")
     end
 
     test "script/4", %{conn: c} do

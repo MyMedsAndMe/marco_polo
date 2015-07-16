@@ -19,7 +19,7 @@ defmodule MarcoPoloMiscTest do
   test "working with embedded lists in schemaful classes", %{conn: c} do
     class = "WorkingWithLists"
 
-    {:ok, [cluster_id]} = command(c, "CREATE CLASS #{class}")
+    {:ok, cluster_id} = command(c, "CREATE CLASS #{class}")
     {:ok, _}            = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
     doc = %Document{class: class, fields: %{"l" => [1, "foo", 3.14]}}
@@ -37,7 +37,7 @@ defmodule MarcoPoloMiscTest do
     assert doc.fields == %{"name" => "create and update", "f" => "foo"}
 
     cmd = "UPDATE Schemaless SET f = 'bar' WHERE name = 'create and update'"
-    {:ok, [new_version]} = command(c, cmd)
+    {:ok, new_version} = command(c, cmd)
 
     {:ok, [new_doc]} = load_record(c, doc.rid, "*:-1")
 
