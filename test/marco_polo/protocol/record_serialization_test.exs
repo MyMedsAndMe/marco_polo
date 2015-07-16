@@ -139,14 +139,14 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: links" do
-    rid = %RID{cluster_id: 101, position: 99}
-    assert decode_type(<<101 :: 32, 99 :: 32, "foo">>, :link) == {rid, "foo"}
+    rid = %RID{cluster_id: 17, position: 0}
+    assert decode_type(<<34, 0, "foo">>, :link) == {rid, "foo"}
   end
 
   test "decode_type/2: link lists" do
     data = <<4, # number of elements as a zigzag varint
-             1 :: 32, 2 :: 32, # link
-             8 :: 32, 9 :: 32, # link
+             2, 4, # link
+             16, 18, # link
              "foo">>
 
     list = {:link_list, [%RID{cluster_id: 1, position: 2}, %RID{cluster_id: 8, position: 9}]}
@@ -155,8 +155,8 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "decode_type/2: link sets" do
     data = <<4, # number of elements as a zigzag varint
-             0 :: 32, 1 :: 32, # link
-             9 :: 32, 9 :: 32, # link
+             18, 18, # link
+             0, 2, # link
              "foo">>
 
     links        = [%RID{cluster_id: 9, position: 9}, %RID{cluster_id: 0, position: 1}]
@@ -173,9 +173,9 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     data = <<4, # nkeys, varint
              7, 6, "foo", # key type + key value
-             <<1 :: 32, 2 :: 32>>, # rid
+             <<2, 4>>, # rid
              7, 6, "bar", # key type + key value
-             <<3 :: 32, 9 :: 32>>, # rid
+             <<6, 18>>, # rid
              "foo">>
 
     assert decode_type(data, :link_map) == {{:link_map, expected_map}, "foo"}
@@ -277,7 +277,8 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "encode_value/1: links" do
     rid = %RID{cluster_id: 100, position: 33}
-    assert bin(encode_value(rid)) == <<100 :: 32, 33 :: 32>>
+    assert bin(encode_value(rid))
+           == :small_ints.encode_zigzag_varint(100) <> :small_ints.encode_zigzag_varint(33)
   end
 
   test "encode_value/1: link lists and sets" do
@@ -285,7 +286,10 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     # results.
     rids     = [%RID{cluster_id: 19, position: 4}, %RID{cluster_id: 0, position: 1}]
     set      = Enum.into(rids, HashSet.new)
-    expected = <<4, 19 :: 32, 4 :: 32, 0 :: 32, 1 :: 32>>
+    expected = <<4, :small_ints.encode_zigzag_varint(19) :: binary,
+                    :small_ints.encode_zigzag_varint(4) :: binary,
+                    :small_ints.encode_zigzag_varint(0) :: binary,
+                    :small_ints.encode_zigzag_varint(1) :: binary>>
 
     assert bin(encode_value({:link_list, rids})) == expected
     assert bin(encode_value({:link_set, set}))   == expected
@@ -298,9 +302,11 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     }
     expected = <<4, # nkeys, varint
                  7, 6, "foo", # key type + key value
-                 <<1 :: 32, 2 :: 32>>, # rid
+                 :small_ints.encode_zigzag_varint(1) :: binary,
+                 :small_ints.encode_zigzag_varint(2) :: binary, # rid
                  7, 6, "bar", # key type + key value
-                 <<3 :: 32, 9 :: 32>>, # rid
+                 :small_ints.encode_zigzag_varint(3) :: binary,
+                 :small_ints.encode_zigzag_varint(9) :: binary, # rid
                  >>
 
     assert bin(encode_value({:link_map, map})) == expected

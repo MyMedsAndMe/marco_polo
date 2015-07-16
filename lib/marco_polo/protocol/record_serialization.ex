@@ -200,7 +200,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Enum.into(pairs, %{}), rest}
   end
 
-  def decode_type(<<cluster_id :: 32, position :: 32, rest :: binary>>, :link, _) do
+  def decode_type(data, :link, _) do
+    {cluster_id, rest} = :small_ints.decode_zigzag_varint(data)
+    {position, rest} = :small_ints.decode_zigzag_varint(rest)
+
     {%RID{cluster_id: cluster_id, position: position}, rest}
   end
 
@@ -390,7 +393,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp encode_type(%RID{cluster_id: id, position: pos}, :link, _offset) do
-    <<id :: 32, pos :: 32>>
+    :small_ints.encode_zigzag_varint(id) <> :small_ints.encode_zigzag_varint(pos)
   end
 
   defp encode_type(rids, :link_list, offset) do
