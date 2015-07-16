@@ -78,8 +78,6 @@ defmodule MarcoPoloMiscTest do
   end
 
   test "unknown property ids are handled automatically", %{conn: c} do
-    import MarcoPolo, only: [command: 2, command: 3]
-
     {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
     {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
 
