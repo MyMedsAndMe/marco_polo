@@ -374,7 +374,7 @@ defmodule MarcoPolo do
   """
   @spec command(pid, String.t, Keyword.t) :: term
   def command(conn, query, opts \\ []) do
-    query_type = MarcoPolo.QueryParser.query_type(query)
+    query_type = query_type(query)
 
     command_class_name =
       case query_type do
@@ -475,5 +475,21 @@ defmodule MarcoPolo do
     |> Stream.with_index
     |> Stream.map(fn({val, i}) -> {i, val} end)
     |> Enum.into(%{})
+  end
+
+  defp query_type(query) do
+    case query_command(query) do
+      cmd when cmd in ["select", "traverse"] ->
+        :sql_query
+      _ ->
+        :sql_command
+    end
+  end
+
+  defp query_command(query) do
+    regex               = ~r/^\s*(?<cmd>\w+)/
+    %{"cmd" => command} = Regex.named_captures(regex, query)
+
+    String.downcase(command)
   end
 end
