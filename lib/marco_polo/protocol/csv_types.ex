@@ -29,6 +29,9 @@ defmodule MarcoPolo.Protocol.CSVTypes do
       "foo"
 
   """
+  @spec decode(binary) :: nil | binary | integer | float | boolean | MarcoPolo.RID.t
+  def decode(data)
+
   # Strings
   def decode("\"" <> rest) do
     [str, ""] = :binary.split(rest, "\"")

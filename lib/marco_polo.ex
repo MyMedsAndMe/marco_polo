@@ -20,6 +20,8 @@ defmodule MarcoPolo do
   @type db_type :: :document | :graph
   @type storage_type :: :plocal | :memory
 
+  @type rec :: Document.t | BinaryRecord.t
+
   @doc """
   Starts the connection with an OrientDB server.
 
@@ -57,7 +59,8 @@ defmodule MarcoPolo do
       {:ok, true}
 
   """
-  @spec db_exists?(pid, String.t, String.t, Keyword.t) :: {:ok, boolean}
+  @spec db_exists?(pid, String.t, String.t, Keyword.t) ::
+    {:ok, boolean} | {:error, term}
   def db_exists?(conn, name, type, opts \\ []) do
     C.operation(conn, :db_exist, [name, type], opts)
   end
@@ -71,7 +74,7 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec db_reload(pid) :: :ok
+  @spec db_reload(pid) :: :ok | {:error, term}
   def db_reload(conn, opts \\ []) do
     case C.operation(conn, :db_reload, [], opts) do
       {:ok, _}            -> :ok
@@ -91,7 +94,8 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec create_db(pid, String.t, db_type, storage_type, Keyword.t) :: :ok
+  @spec create_db(pid, String.t, db_type, storage_type, Keyword.t) ::
+    :ok | {:error, term}
   def create_db(conn, name, type, storage, opts \\ [])
       when type in [:document, :graph] and storage in [:plocal, :memory] do
     type    = Atom.to_string(type)
@@ -115,7 +119,7 @@ defmodule MarcoPolo do
       :ok
 
   """
-  @spec drop_db(pid, String.t, storage_type, Keyword.t) :: :ok
+  @spec drop_db(pid, String.t, storage_type, Keyword.t) :: :ok | {:error, term}
   def drop_db(conn, name, storage, opts \\ []) when storage in [:plocal, :memory] do
     case C.operation(conn, :db_drop, [name, Atom.to_string(storage)], opts) do
       {:ok, nil} -> :ok
@@ -132,7 +136,7 @@ defmodule MarcoPolo do
       {:ok, 1158891}
 
   """
-  @spec db_size(pid, Keyword.t) :: {:ok, non_neg_integer}
+  @spec db_size(pid, Keyword.t) :: {:ok, non_neg_integer} | {:error, term}
   def db_size(conn, opts \\ []) do
     C.operation(conn, :db_size, [], opts)
   end
@@ -146,7 +150,7 @@ defmodule MarcoPolo do
       {:ok, 7931}
 
   """
-  @spec db_countrecords(pid, Keyword.t) :: {:ok, non_neg_integer}
+  @spec db_countrecords(pid, Keyword.t) :: {:ok, non_neg_integer} | {:error, term}
   def db_countrecords(conn, opts \\ []) do
     C.operation(conn, :db_countrecords, [], opts)
   end
@@ -175,7 +179,7 @@ defmodule MarcoPolo do
 
   """
   @spec create_record(pid, non_neg_integer, Document.t, Keyword.t) ::
-    {:ok, {RID.t, non_neg_integer}}
+    {:ok, {RID.t, non_neg_integer}} | {:error, term}
   def create_record(conn, cluster_id, record, opts \\ []) do
     args = [{:short, cluster_id}, record, record_type(record)]
 
@@ -218,7 +222,7 @@ defmodule MarcoPolo do
       %{"foo" => "bar"}
 
   """
-  @spec load_record(pid, RID.t, Keyword.t) :: {:ok, [Document.t]}
+  @spec load_record(pid, RID.t, Keyword.t) :: {:ok, [Document.t]} | {:error, term}
   def load_record(conn, %RID{} = rid, opts \\ []) do
     {op, args} =
       if opts[:if_version_not_latest] do
@@ -272,7 +276,7 @@ defmodule MarcoPolo do
 
   """
   @spec update_record(pid, RID.t, non_neg_integer, Document.t, boolean, Keyword.t) ::
-    {:ok, non_neg_integer}
+    {:ok, non_neg_integer} | {:error, term}
   def update_record(conn, %RID{} = rid, version, new_record, update_content?, opts \\ []) do
     args = [{:short, rid.cluster_id},
             {:long, rid.position},
@@ -304,7 +308,8 @@ defmodule MarcoPolo do
       {:ok, true}
 
   """
-  @spec delete_record(pid, RID.t, non_neg_integer, Keyword.t) :: {:ok, boolean}
+  @spec delete_record(pid, RID.t, non_neg_integer, Keyword.t) ::
+    {:ok, boolean} | {:error, term}
   def delete_record(conn, %RID{} = rid, version, opts \\ []) do
     args = [{:short, rid.cluster_id},
             {:long, rid.position},
@@ -372,7 +377,7 @@ defmodule MarcoPolo do
       "abed"
 
   """
-  @spec command(pid, String.t, Keyword.t) :: term
+  @spec command(pid, String.t, Keyword.t) :: {:ok, term} | {:error, term}
   def command(conn, query, opts \\ []) do
     query_type = query_type(query)
 
@@ -414,7 +419,7 @@ defmodule MarcoPolo do
       2
 
   """
-  @spec script(pid, String.t, String.t, Keyword.t) :: {:ok, term}
+  @spec script(pid, String.t, String.t, Keyword.t) :: {:ok, term} | {:error, term}
   def script(conn, language, text, opts \\ []) do
     command_class_name = Protocol.encode_term("s")
 

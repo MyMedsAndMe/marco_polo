@@ -19,7 +19,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   protocol. This happens because this function is usually called from the parser
   that parsed the byte array.
   """
-  @spec decode(binary, Dict.t) :: Document.t
+  @spec decode(binary, Dict.t) :: MarcoPolo.rec | :unknown_property_id
   def decode(data, schema \\ %{}) do
     <<_serialization_version, rest :: binary>> = data
 
@@ -41,7 +41,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       decode(encode(record)) = record
 
   """
-  @spec encode(Document.t) :: iodata
+  @spec encode(MarcoPolo.record) :: iodata
   def encode(%Document{} = record) do
     # 0 is the serialization version (as a byte), not the record version.
     [0, encode_embedded(record, 1)]

@@ -46,6 +46,8 @@ defmodule MarcoPolo.Connection do
   Performs the operation identified by `op_name` with the connection on
   `pid`. `args` is the list of arguments to pass to the operation.
   """
+  @spec operation(pid, atom, [Protocol.encodable_term], Keyword.t) ::
+    {:ok, term} | {:error, term}
   def operation(pid, op_name, args, opts) do
     Connection.call(pid, {:operation, op_name, args}, opts[:timeout] || @timeout)
   end
@@ -54,7 +56,7 @@ defmodule MarcoPolo.Connection do
   Does what `operation/3` does but expects no response from OrientDB and always
   returns `:ok`.
   """
-  @spec no_response_operation(pid, atom, [term]) :: :ok
+  @spec no_response_operation(pid, atom, [Protocol.encodable_term]) :: :ok
   def no_response_operation(pid, op_name, args) do
     Connection.cast(pid, {:operation, op_name, args})
   end
