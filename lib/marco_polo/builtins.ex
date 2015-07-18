@@ -4,7 +4,7 @@
 # struct and a `MarcoPolo.Date` struct is encoded as an OrientDB date.
 
 defmodule MarcoPolo.Date do
-  @doc """
+  @moduledoc """
   Struct that expresses an OrientDB date.
 
   Fields:
@@ -25,7 +25,7 @@ defmodule MarcoPolo.Date do
 end
 
 defmodule MarcoPolo.DateTime do
-  @doc """
+  @moduledoc """
   Struct that expresses an OrientDB datetime.
 
   Fields:
