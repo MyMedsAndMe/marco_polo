@@ -1,3 +1,8 @@
+# This file contains the definition of some structs used to map from some
+# OrientDB data types (like dates) to the corresponding Elixir data
+# structure. For example, an OrientDB date is represented as a `MarcoPolo.Date`
+# struct and a `MarcoPolo.Date` struct is encoded as an OrientDB date.
+
 defmodule MarcoPolo.Date do
   @doc """
   Struct that expresses an OrientDB date.
