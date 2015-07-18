@@ -33,7 +33,7 @@ defmodule MarcoPolo.GenericParser do
   Parses `data` based on the given list of parsers. Returns `:incomplete` when
   the data is not enough to satisfy all `parsers`, `{value, rest}` otherwise.
   """
-  @spec parse(binary, [parser]) :: ok_or_incomplete
+  @spec parse(binary, parser | [parser]) :: ok_or_incomplete
   def parse(data, parsers)
 
   # You could basically call the parser directly on the data, but using
@@ -64,7 +64,7 @@ defmodule MarcoPolo.GenericParser do
   the given binary using the `nelems_fn` parser; then, it will parse elements
   using the `elem_parsers` parsers that number of times.
   """
-  @spec array_parser(parser, [parser]) :: parser
+  @spec array_parser(parser, parser | [parser]) :: parser
   def array_parser(nelems_fn, elem_parsers) when is_function(nelems_fn, 1) do
     fn(data) ->
       case nelems_fn.(data) do
