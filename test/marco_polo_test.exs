@@ -97,7 +97,7 @@ defmodule MarcoPoloTest do
       assert %Document{} = record
       assert record.version == 1
       assert record.class   == "Schemaless"
-      assert record.fields  == %{"name" => "record_load"}
+      assert record.fields  == %{"name" => "record_load", "f" => "foo"}
 
       rid = TestHelpers.record_rid("schemaless_record_load")
 
@@ -178,13 +178,23 @@ defmodule MarcoPoloTest do
       assert record.fields["name"] == "record_load"
     end
 
-    test "command/3: SELECT query with a WHERE clause and parameters", %{conn: c} do
+    test "command/3: SELECT query with named parameters", %{conn: c} do
       cmd    = "SELECT FROM Schemaless WHERE name = :name"
       params = %{"name" => "record_load"}
       res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
 
       assert {:ok, [%Document{} = record]} = res
       assert record.fields["name"] == "record_load"
+    end
+
+    test "command/3: SELECT query with positional parameters", %{conn: c} do
+      cmd = "SELECT FROM Schemaless WHERE name = ? AND f = ?"
+      params = ["record_load", "foo"]
+      res = MarcoPolo.command(c, cmd, params: params)
+
+      assert {:ok, [%Document{} = doc]} = res
+      assert doc.fields["name"] == "record_load"
+      assert doc.fields["f"] == "foo"
     end
 
     test "command/3: INSERT query inserting multiple records", %{conn: c} do

@@ -432,11 +432,10 @@ defmodule MarcoPolo do
   end
 
   defp encode_query_with_type(:sql_query, query, opts) do
-    params = opts[:params] || %{}
     args = [query,
             -1,
             opts[:fetch_plan] || @default_fetch_plan,
-            %Document{class: nil, fields: %{"params" => params}}]
+            %Document{class: nil, fields: %{"params" => to_params(opts[:params] || %{})}}]
 
     Protocol.encode_list_of_terms(args)
   end
@@ -445,7 +444,7 @@ defmodule MarcoPolo do
     args = [query]
 
     if params = opts[:params] do
-      params = %Document{class: nil, fields: %{"parameters" => params}}
+      params = %Document{class: nil, fields: %{"parameters" => to_params(params)}}
       # `true` means "use simple parameters".
       args = args ++ [true, params]
     else
@@ -465,5 +464,16 @@ defmodule MarcoPolo do
       o ->
         o
     end
+  end
+
+  defp to_params(params) when is_map(params) do
+    params
+  end
+
+  defp to_params(params) when is_list(params) do
+    params
+    |> Stream.with_index
+    |> Stream.map(fn({val, i}) -> {i, val} end)
+    |> Enum.into(%{})
   end
 end

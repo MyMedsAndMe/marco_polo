@@ -84,7 +84,7 @@ unless :integration in ExUnit.configuration[:exclude] do
   records = records ++ [
     insert_record.("record_delete", "INSERT INTO Schemaless(name) VALUES ('record_delete');"),
     insert_record.("record_update", "INSERT INTO Schemaless(name, f) VALUES ('record_update', 'foo');"),
-    insert_record.("record_load", "INSERT INTO Schemaless(name) VALUES ('record_load');"),
+    insert_record.("record_load", "INSERT INTO Schemaless(name, f) VALUES ('record_load', 'foo');"),
     insert_record.("schemaless_record_load", "INSERT INTO Schemaful(myString) VALUES ('record_load');"),
   ]
 
