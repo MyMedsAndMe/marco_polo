@@ -4,12 +4,12 @@ defmodule MarcoPolo.Document do
 
   Contains the following fields:
 
+    * `:rid` - the record id of the document (as a `MarcoPolo.RID`). It's `nil`
+      for new documents (not yet stored on the database).
     * `:class` - the class of the document. Can be `nil` when the document has
       no class.
     * `:version` - the version of the document.
     * `:fields` - the fields of the document.
-    * `:rid` - the record id of the document (as a `MarcoPolo.RID`). It's `nil`
-      for new documents (not yet stored on the database).
 
   """
 
