@@ -22,6 +22,7 @@ defmodule MarcoPolo.Mixfile do
     [{:decimal, "~> 1.1.0"},
      {:connection, github: "fishcakez/connection"},
      {:small_ints, github: "whatyouhide/small_ints"},
+     {:dialyze, "~> 0.2.0", only: :dev},
      {:ex_doc, "~> 0.7", only: :docs}]
   end
 end
