@@ -165,7 +165,7 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_errors(data) do
     case parse_errors(data, []) do
-      {errors, rest} -> {Error.from_errors(errors), rest}
+      {errors, rest} -> {%Error{errors: errors}, rest}
       :incomplete    -> :incomplete
     end
   end
