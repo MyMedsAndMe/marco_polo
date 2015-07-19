@@ -6,6 +6,7 @@ defmodule MarcoPoloMiscTest do
   alias MarcoPolo.Document
   alias MarcoPolo.BinaryRecord
   alias MarcoPolo.RID
+  alias MarcoPolo.Error
 
   setup do
     {:ok, conn} = MarcoPolo.start_link(
@@ -119,5 +120,16 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, {%RID{} = rid, _}} = create_record(c, cluster_id, blob)
     assert {:ok, [%BinaryRecord{} = record]} = load_record(c, rid)
     assert record.contents == <<91, 23>>
+  end
+
+  test "bad ops (server op on the db or viceversa) make the GenServer exit" do
+    Process.flag :trap_exit, true
+    {:ok, c} = start_link(user: TestHelpers.user, password: TestHelpers.password, connection: :server)
+
+    msg = "must be connected to a database to perform operation db_reload"
+
+    Logger.remove_backend(:console, flush: true)
+    assert {{%Error{message: ^msg}, _}, _} = catch_exit(db_reload(c))
+    Logger.add_backend(:console, flush: true)
   end
 end

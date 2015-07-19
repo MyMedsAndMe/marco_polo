@@ -131,6 +131,8 @@ defmodule MarcoPolo.Connection do
   end
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
+    check_op_is_allowed!(s, op_name)
+
     req = Protocol.encode_op(op_name, [sid|args])
     s
     |> enqueue({from, op_name})
@@ -139,11 +141,15 @@ defmodule MarcoPolo.Connection do
 
   @doc false
   def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
+    check_op_is_allowed!(s, op_name)
+
     req = Protocol.encode_op(op_name, [sid|args])
     send_noreply(s, req)
   end
 
   def handle_cast(:fetch_schema, %{session_id: sid} = s) do
+    check_op_is_allowed!(s, :record_load)
+
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
@@ -219,5 +225,42 @@ defmodule MarcoPolo.Connection do
         Connection.reply(from, resp)
         %{s | tail: rest, queue: new_queue}
     end
+  end
+
+  defp check_op_is_allowed!(%{opts: opts}, operation) do
+    do_check_op_is_allowed!(Keyword.fetch!(opts, :connection), operation)
+  end
+
+  @server_ops ~w(
+    shutdown
+    db_create
+    db_exist
+    db_drop
+  )a
+
+  @db_ops ~w(
+    db_close
+    db_size
+    db_countrecords
+    db_reload
+    record_load
+    record_load_if_version_not_latest
+    record_create
+    record_update
+    record_delete
+    command
+    tx_commit
+  )a
+
+  defp do_check_op_is_allowed!({:db, _, _}, op) when not op in @db_ops do
+    raise Error, "must be connected to the server (not a db) to perform operation #{op}"
+  end
+
+  defp do_check_op_is_allowed!(:server, op) when not op in @server_ops do
+    raise Error, "must be connected to a database to perform operation #{op}"
+  end
+
+  defp do_check_op_is_allowed!(_, _) do
+    nil
   end
 end
