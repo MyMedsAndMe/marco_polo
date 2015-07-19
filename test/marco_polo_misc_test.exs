@@ -132,4 +132,25 @@ defmodule MarcoPoloMiscTest do
     assert {{%Error{message: ^msg}, _}, _} = catch_exit(db_reload(c))
     Logger.add_backend(:console, flush: true)
   end
+
+  test "working with graphs", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS Person EXTENDS V")
+    {:ok, _} = command(c, "CREATE CLASS Restaurant EXTENDS V")
+    {:ok, _} = command(c, "CREATE CLASS Eat EXTENDS E")
+
+    assert {:ok, %Document{} = jane} = command(c, "CREATE VERTEX Person SET name = 'Jane'")
+    assert {:ok, %Document{} = pizza_place} = command(c, "CREATE VERTEX Restaurant SET name = 'Pizza place'")
+
+    # Let's assert we have the correct documents.
+    assert jane.fields["name"] == "Jane"
+    assert pizza_place.fields["name"] == "Pizza place"
+
+    assert {:ok, [edge]} = command(c, "CREATE EDGE Eat FROM ? to ?", params: [jane.rid, pizza_place.rid])
+
+    assert {:ok, [doc]} = command(c, "SELECT IN() FROM Restaurant WHERE name = 'Pizza place'")
+    assert doc.fields["IN"] == {:link_list, [jane.rid]}
+
+    assert {:ok, [doc]} = command(c, "SELECT OUT() FROM Person WHERE name = 'Jane'")
+    assert doc.fields["OUT"] == {:link_list, [pizza_place.rid]}
+  end
 end
