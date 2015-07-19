@@ -23,7 +23,8 @@ defmodule MarcoPolo.Protocol do
     | {:int, integer}
     | {:long, integer}
     | {:raw, binary}
-    | MarcoPolo.Document.t
+    | Document.t
+    | BinaryRecord.t
 
   @ok    <<0>>
   @error <<1>>

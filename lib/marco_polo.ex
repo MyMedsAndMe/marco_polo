@@ -178,7 +178,7 @@ defmodule MarcoPolo do
       {:ok, {%MarcoPolo.RID{cluster_id: 15, position: 10}, 1}}
 
   """
-  @spec create_record(pid, non_neg_integer, Document.t, Keyword.t) ::
+  @spec create_record(pid, non_neg_integer, rec, Keyword.t) ::
     {:ok, {RID.t, non_neg_integer}} | {:error, term}
   def create_record(conn, cluster_id, record, opts \\ []) do
     args = [{:short, cluster_id}, record, record_type(record)]
