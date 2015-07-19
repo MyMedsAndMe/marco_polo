@@ -33,8 +33,8 @@ defmodule MarcoPoloTest do
     end
 
     test "db_exists?/3", %{conn: c}  do
-      assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", "plocal")
-      assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", "plocal")
+      assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", :plocal)
+      assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", :plocal)
     end
 
     test "create_db/4 with a database that doens't exist yet", %{conn: c} do

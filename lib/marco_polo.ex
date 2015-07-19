@@ -59,10 +59,10 @@ defmodule MarcoPolo do
       {:ok, true}
 
   """
-  @spec db_exists?(pid, String.t, String.t, Keyword.t) ::
+  @spec db_exists?(pid, String.t, storage_type, Keyword.t) ::
     {:ok, boolean} | {:error, term}
-  def db_exists?(conn, name, type, opts \\ []) do
-    C.operation(conn, :db_exist, [name, type], opts)
+  def db_exists?(conn, name, type, opts \\ []) when type in [:plocal, :memory] do
+    C.operation(conn, :db_exist, [name, Atom.to_string(type)], opts)
   end
 
   @doc """
