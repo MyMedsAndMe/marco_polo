@@ -10,7 +10,7 @@ defmodule MarcoPolo do
     port: 2424,
   ]
 
-  @default_fetch_plan "*:0"
+  @default_fetch_plan ""
 
   @request_modes %{
     sync: {:raw, <<0>>},
