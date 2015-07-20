@@ -243,6 +243,16 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Decimal.new(value), rest}
   end
 
+  # 1 means "embedded" RidBag.
+  def decode_type(<<1, size :: 32, rest :: binary>>, :link_bag, _) do
+    {rids, rest} = Enum.map_reduce List.duplicate(0, size), rest, fn(_, acc) ->
+      <<cluster_id :: 16, position :: 64, acc :: binary>> = acc
+      {%RID{cluster_id: cluster_id, position: position}, acc}
+    end
+
+    {{:link_bag, rids}, rest}
+  end
+
   # TODO: decoding of the LinkBag type, which has... no docs :D
 
   defp decode_map_header(data) do
@@ -415,6 +425,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
 
     [:small_ints.encode_zigzag_varint(map_size(rid_map)), keys_and_values]
+  end
+
+  defp encode_type(rids, :link_bag, _) do
+    encoded_rids = Enum.map rids, fn(%RID{cluster_id: cluster_id, position: position}) ->
+      <<cluster_id :: 16, position :: 64>>
+    end
+
+    [1, <<length(rids) :: 32>>|encoded_rids]
   end
 
   # TODO: encoding of the LinkBag type which isn't documented *at all*! Yay!

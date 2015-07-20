@@ -192,6 +192,17 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert decode_type(data, :decimal) == {Decimal.new(3.1415), "foo"}
   end
 
+  test "decode_type/2: link bags" do
+    data = <<1,                 # embedded link bag
+             2 :: 32,           # size
+             1 :: 16, 22 :: 64, # rid
+             9 :: 16, 14 :: 64, # rid
+             "foo">>
+
+    rids = [%RID{cluster_id: 1, position: 22}, %RID{cluster_id: 9, position: 14}]
+    assert decode_type(data, :link_bag) == {{:link_bag, rids}, "foo"}
+  end
+
   ## Encoding
 
   test "encode_value/1: simple types" do
@@ -310,6 +321,17 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                  >>
 
     assert bin(encode_value({:link_map, map})) == expected
+  end
+
+  test "encode_value/1: link bags" do
+    rids = [%RID{cluster_id: 1, position: 22}, %RID{cluster_id: 9, position: 14}]
+    data = <<1,                 # embedded link bag
+             2 :: 32,           # size
+             1 :: 16, 22 :: 64, # rid
+             9 :: 16, 14 :: 64, # rid
+             >>
+
+    assert bin(encode_value({:link_bag, rids})) == data
   end
 
   defp bin(iodata) do
