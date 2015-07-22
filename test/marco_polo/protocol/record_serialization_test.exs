@@ -254,8 +254,23 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(record)) == record_content
   end
 
+  test "encode_value/1: embedded document with nil fields" do
+    record = %Document{class: "foo", fields: %{"f1" => nil}}
+    expected = <<6, "foo",               # class
+                 4, "f1", 0, 0, 0, 0, 0, # field
+                 0>>                     # end of header
+
+    assert bin(encode_value(record)) == expected
+  end
+
   test "encode_value/1: embedded lists" do
     assert (bin(encode_value(["elem", true])) <> "foo") == @list
+
+   nested = <<2, 23, 10,
+              <<2, 23, 7, 12, "nested">>,
+              >>
+   assert bin(encode_value([{:embedded_list, ["nested"]}])) == nested
+
   end
 
   test "encode_value/1: embedded sets" do
