@@ -10,6 +10,7 @@ defmodule MarcoPolo.Mixfile do
      elixir: "~> 1.0",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     test_coverage: [tool: Coverex.Task],
      deps: deps]
   end
 
@@ -23,6 +24,7 @@ defmodule MarcoPolo.Mixfile do
      {:connection, github: "fishcakez/connection"},
      {:small_ints, github: "whatyouhide/small_ints"},
      {:dialyze, "~> 0.2.0", only: :dev},
+     {:coverex, "~> 1.4", only: :test},
      {:ex_doc, "~> 0.7", only: :docs}]
   end
 end
