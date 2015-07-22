@@ -51,6 +51,23 @@ defmodule MarcoPolo do
   end
 
   @doc """
+  Closes the connection (asynchronously), doing the required cleanup work.
+
+  It always returns `:ok` as soon as it's called (regardless of the operation
+  being successful) since it is asynchronous.
+
+  ## Examples
+
+      iex> MarcoPolo.stop(conn)
+      :ok
+
+  """
+  @spec stop(pid) :: :ok
+  def stop(conn) do
+    C.stop(conn)
+  end
+
+  @doc """
   Tells whether the database called `name` with the given `type` exists.
 
   ## Examples

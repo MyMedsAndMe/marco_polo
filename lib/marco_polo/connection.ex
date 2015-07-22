@@ -43,6 +43,14 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc """
+  Shuts down the connection (asynchronously since it's a cast).
+  """
+  @spec stop(pid) :: :ok
+  def stop(pid) do
+    Connection.cast(pid, :stop)
+  end
+
+  @doc """
   Performs the operation identified by `op_name` with the connection on
   `pid`. `args` is the list of arguments to pass to the operation.
   """
@@ -111,6 +119,15 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def disconnect(:stop, %{socket: nil} = s) do
+    {:stop, :normal, s}
+  end
+
+  def disconnect(:stop, %{socket: socket} = s) do
+    :gen_tcp.close(socket)
+    {:stop, :normal, %{s | socket: nil}}
+  end
+
   def disconnect(error, s) do
     # We only care about {from, _} tuples, ignoring queued stuff like
     # :fetch_schema.
@@ -156,6 +173,10 @@ defmodule MarcoPolo.Connection do
     s
     |> enqueue(:fetch_schema)
     |> send_noreply(req)
+  end
+
+  def handle_cast(:stop, s) do
+    {:disconnect, :stop, s}
   end
 
   @doc false
