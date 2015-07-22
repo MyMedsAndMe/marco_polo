@@ -293,7 +293,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     acc = {[], [], offset}
     {fields, values, _} = Enum.reduce fields, acc, fn({field_name, field_value}, {fs, vs, index}) ->
-      encoded_value = encode_value(field_value, index)
+      encoded_value =
+        if is_nil(field_value) do
+          <<>>
+        else
+          encode_value(field_value, index)
+        end
+
       encoded_field = encode_field_for_header(field_name, index, field_value)
       index         = index + IO.iodata_length(encoded_value)
 
