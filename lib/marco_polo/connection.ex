@@ -193,8 +193,10 @@ defmodule MarcoPolo.Connection do
 
   defp send_noreply(%{socket: socket} = s, req) do
     case :gen_tcp.send(socket, req) do
-      :ok                       -> {:noreply, s}
-      {:error, _reason} = error -> {:disconnect, error, s}
+      :ok ->
+        {:noreply, s}
+      {:error, _reason} = error ->
+        {:disconnect, error, s}
     end
   end
 

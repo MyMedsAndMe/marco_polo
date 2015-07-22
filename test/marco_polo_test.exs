@@ -223,7 +223,7 @@ defmodule MarcoPoloTest do
       db.command('CREATE CLASS ScriptTest');
 
       for (i = 1; i <= 3; i++) {
-      db.command('INSERT INTO ScriptTest(foo) VALUES("test' + i + '")');
+        db.command('INSERT INTO ScriptTest(foo) VALUES("test' + i + '")');
       }
       """
 

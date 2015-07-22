@@ -22,7 +22,7 @@ defmodule MarcoPoloMiscTest do
     class = "WorkingWithLists"
 
     {:ok, cluster_id} = command(c, "CREATE CLASS #{class}")
-    {:ok, _}            = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
+    {:ok, _} = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
     doc = %Document{class: class, fields: %{"l" => [1, "foo", 3.14]}}
 
