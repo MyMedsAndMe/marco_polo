@@ -97,6 +97,11 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert decode_type(<<4, 77, 45, "foo">>, :binary) == {<<77, 45>>, "foo"}
   end
 
+  test "decode_type/2: date" do
+    date = %MarcoPolo.Date{year: 1945, month: 9, day: 11}
+    assert decode_type(<<219, 138, 1, "foo">>, :date) == {date, "foo"}
+  end
+
   test "decode_type/2: datetime" do
     data = :small_ints.encode_zigzag_varint(1435665809901) <> "foo"
     datetime = %DateTime{year: 2015, month: 6, day: 30,
@@ -234,6 +239,11 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(3.14)) == <<64, 9, 30, 184, 81, 235, 133, 31>>
     assert bin(encode_value({:float, 3.14})) == <<64, 72, 245, 195>>
     assert bin(encode_value({:double, 3.14})) == <<64, 9, 30, 184, 81, 235, 133, 31>>
+  end
+
+  test "encode_value/1: date" do
+    date = %MarcoPolo.Date{year: 1945, month: 9, day: 11}
+    assert bin(encode_value(date)) == <<219, 138, 1>>
   end
 
   test "encode_value/1: datetime" do

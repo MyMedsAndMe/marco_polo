@@ -158,6 +158,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {string, rest}
   end
 
+  def decode_type(data, :date, _) do
+    {days, rest} = :small_ints.decode_zigzag_varint(data)
+    days = :calendar.date_to_gregorian_days(1970, 1, 1) + days
+    {y, m, d} = :calendar.gregorian_days_to_date(days)
+    {%MarcoPolo.Date{year: y, month: m, day: d}, rest}
+  end
+
   def decode_type(data, :datetime, _) do
     {msecs_from_epoch, rest} = decode_type(data, :long)
     secs_from_epoch = div(msecs_from_epoch, 1000)
@@ -372,6 +379,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_type(x, :float, _offset), do: <<x :: 32-float>>
   defp encode_type(x, :double, _offset), do: <<x :: 64-float>>
 
+  defp encode_type(date, :date, _offset) do
+     import :calendar, only: [date_to_gregorian_days: 3]
+     days = date_to_gregorian_days(date.year, date.month, date.day) - date_to_gregorian_days(1970, 1, 1)
+     :small_ints.encode_zigzag_varint(days)
+  end
+
   defp encode_type(dt, :datetime, _offset) do
     datetime = {{dt.year, dt.month, dt.day}, {dt.hour, dt.min, dt.sec}}
     secs     = :calendar.datetime_to_gregorian_seconds(datetime)
@@ -474,6 +487,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(%HashSet{}),               do: :embedded_set
   defp infer_type(%Document{}),              do: :embedded
   defp infer_type(%RID{}),                   do: :link
+  defp infer_type(%MarcoPolo.Date{}),        do: :date
   defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
   defp infer_type(%Decimal{}),               do: :decimal
   defp infer_type(val) when is_boolean(val), do: :boolean
