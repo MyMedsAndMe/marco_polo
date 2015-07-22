@@ -258,14 +258,19 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     Tree-based RidBags are not supported by MarcoPolo (yet); only embedded
     RidBags are. You can change your OrientDB server configuration to force
     OrientDB to use embedded RidBags over tree-based ones. To learn more about
-    changing the server configuration, visit http://orientdb.com/docs/last/Configuration.html.
-    The setting to change is `ridBag.embeddedToSbtreeBonsaiThreshold`:
+    changing the server configuration, visit
+    http://orientdb.com/docs/last/Configuration.html.  The setting to change is
+    `ridBag.embeddedToSbtreeBonsaiThreshold`: set it to a very high value to
+    ensure OrientDB uses embedded RidBags up to that number of relations. For
+    example:
 
         <properties>
-          <entry name="cache.size" value="10000" />
-          <entry name="storage.keepOpen" value="true" />
+          ...
+          <entry name="ridBag.embeddedToSbtreeBonsaiThreshold" value="1000000000" />
         </properties>
 
+    Note that for this configuration to take effect for a database, that
+    database must be created after this configuration is set on the server.
     """
   end
 
