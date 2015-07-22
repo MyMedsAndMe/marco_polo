@@ -192,7 +192,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert decode_type(data, :decimal) == {Decimal.new(3.1415), "foo"}
   end
 
-  test "decode_type/2: link bags" do
+  test "decode_type/2: link bags (embedded)" do
     data = <<1,                 # embedded link bag
              2 :: 32,           # size
              1 :: 16, 22 :: 64, # rid
@@ -201,6 +201,16 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     rids = [%RID{cluster_id: 1, position: 22}, %RID{cluster_id: 9, position: 14}]
     assert decode_type(data, :link_bag) == {{:link_bag, rids}, "foo"}
+  end
+
+  test "decode_type/2: link bags (tree)" do
+    # Whatever binary fails as long as the first byte is not 1 (which is
+    # embedded linkbag).
+    exception = assert_raise MarcoPolo.Error, fn ->
+      decode_type(<<0, 1, 1, 1>>, :link_bag)
+    end
+
+    assert exception.message =~ "Tree-based RidBags are not supported by MarcoPolo"
   end
 
   ## Encoding

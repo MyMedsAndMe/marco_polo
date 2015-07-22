@@ -253,7 +253,21 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {{:link_bag, rids}, rest}
   end
 
-  # TODO: decoding of the LinkBag type, which has... no docs :D
+  def decode_type(_, :link_bag, _) do
+    raise MarcoPolo.Error, """
+    Tree-based RidBags are not supported by MarcoPolo (yet); only embedded
+    RidBags are. You can change your OrientDB server configuration to force
+    OrientDB to use embedded RidBags over tree-based ones. To learn more about
+    changing the server configuration, visit http://orientdb.com/docs/last/Configuration.html.
+    The setting to change is `ridBag.embeddedToSbtreeBonsaiThreshold`:
+
+        <properties>
+          <entry name="cache.size" value="10000" />
+          <entry name="storage.keepOpen" value="true" />
+        </properties>
+
+    """
+  end
 
   defp decode_map_header(data) do
     {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
@@ -427,15 +441,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     [:small_ints.encode_zigzag_varint(map_size(rid_map)), keys_and_values]
   end
 
-  defp encode_type(rids, :link_bag, _) do
+  defp encode_type(rids, :link_bag, _) when is_list(rids) do
     encoded_rids = Enum.map rids, fn(%RID{cluster_id: cluster_id, position: position}) ->
       <<cluster_id :: 16, position :: 64>>
     end
 
     [1, <<length(rids) :: 32>>|encoded_rids]
   end
-
-  # TODO: encoding of the LinkBag type which isn't documented *at all*! Yay!
 
   defp map_header_offset(map) do
     keys = Map.keys(map)
