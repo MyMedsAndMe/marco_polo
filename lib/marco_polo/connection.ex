@@ -187,8 +187,11 @@ defmodule MarcoPolo.Connection do
   end
 
   defp setup_socket_buffers(socket) do
-    {:ok, [sndbuf: sndbuf, recbuf: recbuf]} = :inet.getopts(socket, [:sndbuf, :recbuf])
-    :ok = :inet.setopts(socket, [buffer: max(sndbuf, recbuf)])
+    {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
+      :inet.getopts(socket, [:sndbuf, :recbuf, :buffer])
+
+    buffer = buffer |> max(sndbuf) |> max(recbuf)
+    :ok = :inet.setopts(socket, [buffer: buffer])
   end
 
   defp send_noreply(%{socket: socket} = s, req) do
