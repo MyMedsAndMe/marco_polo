@@ -10,6 +10,8 @@ defmodule MarcoPolo.Mixfile do
      elixir: "~> 1.0",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     aliases: ["test.all": "test --include scripting --include integration"],
+     preferred_cli_env: ["test.all": :test],
      test_coverage: [tool: Coverex.Task],
      deps: deps]
   end
