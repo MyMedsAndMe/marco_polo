@@ -1,5 +1,5 @@
 defmodule MarcoPoloMiscTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
   @moduletag :integration
 
   import MarcoPolo
@@ -14,6 +14,8 @@ defmodule MarcoPoloMiscTest do
       user: TestHelpers.user(),
       password: TestHelpers.password()
     )
+
+    on_exit fn -> MarcoPolo.stop(conn) end
 
     {:ok, %{conn: conn}}
   end

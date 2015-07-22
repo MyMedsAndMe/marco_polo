@@ -16,6 +16,7 @@ defmodule MarcoPoloTest do
   test "start_link/1: always returns {:ok, pid}" do
     assert {:ok, pid} = MarcoPolo.start_link(connection: :server)
     assert is_pid(pid)
+    assert :ok = MarcoPolo.stop(pid)
   end
 
   defmodule ConnectedToServer do
@@ -28,6 +29,8 @@ defmodule MarcoPoloTest do
         user: TestHelpers.user(),
         password: TestHelpers.password()
       )
+
+      on_exit fn -> MarcoPolo.stop(conn) end
 
       {:ok, %{conn: conn}}
     end
@@ -71,6 +74,8 @@ defmodule MarcoPoloTest do
         user: TestHelpers.user(),
         password: TestHelpers.password()
       )
+
+      on_exit fn -> MarcoPolo.stop(conn) end
 
       {:ok, %{conn: conn}}
     end
