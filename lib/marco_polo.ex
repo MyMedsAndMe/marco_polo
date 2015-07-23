@@ -28,15 +28,33 @@ defmodule MarcoPolo do
   This function accepts the following options:
 
     * `:user` - (string) the OrientDB user. This option is **required**.
-    * `:pass` - (string) the OrientDB password. This option is **required**.
-    * `:connection` - specifies the connection type. To connect to the OrientDB
-      server (to perform server operations) this option must have the value
-      `:server`; to connect to a database, this option must have the value
-      `{:db, db_name, db_type}`.
-    * `:host` - (string) the host where the OrientDB server is running. Defaults
-      to `"localhost"`.
-    * `:port` - (integer) the port where the OrientDB server is
-      running. Defaults to `2424`.
+    * `:password` - (string) the OrientDB password. This option is **required**.
+    * `:connection` - specifies the connection type. This option is
+      **required**. To learn more about the connection type, refer to the docs
+      for the `MarcoPolo` module (there's a "Connection type" section). It can
+      be:
+      * `:server` - connects to the server to perform server operations
+      * `{:db, db_name, db_type}` - connects to a database to perform database
+        operations. `db_type` can be either `:document` or `:graph`.
+    * `:host` - (string or charlist) the host where the OrientDB server is
+      running. Defaults to `"localhost"`.
+    * `:port` - (integer) the port where the OrientDB server is running.
+      Defaults to `2424`.
+
+  ## Examples
+
+  Connecting to the server:
+
+      iex> {:ok, conn} = MarcoPolo.start_link user: "admin", password: "admin", connection: :server
+      iex> is_pid(conn)
+      true
+
+  Connecting to a database:
+
+      iex> connection = {:db, "MyDatabase", :document}
+      iex> {:ok, conn} = MarcoPolo.start_link user: "admin", password: "admin", connection: connection
+      iex> is_pid(conn)
+      true
 
   """
   @spec start_link(Keyword.t) :: GenServer.on_start
@@ -68,11 +86,15 @@ defmodule MarcoPolo do
   end
 
   @doc """
-  Tells whether the database called `name` with the given `type` exists.
+  Tells if the database called `name` with the given `type` exists.
+
+  This operation can only be performed on connections to the server. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
-      iex> MarcoPolo.db_exists?(conn, "GratefulDeadConcerts", "plocal")
+      iex> MarcoPolo.db_exists?(conn, "GratefulDeadConcerts", :plocal)
       {:ok, true}
 
   """
@@ -84,6 +106,10 @@ defmodule MarcoPolo do
 
   @doc """
   Reloads the database to which `conn` is connected.
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
@@ -104,6 +130,10 @@ defmodule MarcoPolo do
 
   `name` is used as the database name, `type` as the database type (`:document`
   or `:graph`) and `storage` as the storage type (`:plocal` or `:memory`).
+
+  This operation can only be performed on connections to the server. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
@@ -130,6 +160,10 @@ defmodule MarcoPolo do
   This function drops the database identified by the name `name` and the storage
   type `type` (either `:plocal` or `:memory`).
 
+  This operation can only be performed on connections to the server. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
+
   ## Examples
 
       iex> MarcoPolo.drop_db(conn, "UselessDatabase", :memory)
@@ -147,6 +181,10 @@ defmodule MarcoPolo do
   @doc """
   Returns the size of the database to which `conn` is connected.
 
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
+
   ## Examples
 
       iex> MarcoPolo.db_size(conn)
@@ -160,6 +198,10 @@ defmodule MarcoPolo do
 
   @doc """
   Returns the number of records in the database to which `conn` is connected.
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
@@ -188,6 +230,10 @@ defmodule MarcoPolo do
       without waiting for a response. This performs a *fire and forget*
       operation, returning `:ok` every time.
 
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
+
   ## Examples
 
       iex> record = %MarcoPolo.Document{class: "MyClass", fields: %{"foo" => "bar"}}
@@ -215,13 +261,14 @@ defmodule MarcoPolo do
   @doc """
   Loads a record from the database to which `conn` is connected.
 
-  The record to load is identified by `rid`. `fetch_plan` is the [fetching
-  strategy](http://orientdb.com/docs/last/Fetching-Strategies.html) used to
-  fetch the record from the database. Since multiple records could be returned,
+  The record to load is identified by `rid`. Since multiple records could be returned,
   the return value is `{:ok, list_of_records}`.
 
-  This function accepts a list of options (`opts`):
+  This function accepts a list of options:
 
+    * `:fetch_plan` - the [fetching
+      strategy](http://orientdb.com/docs/last/Fetching-Strategies.html) used to
+      fetch the record from the database.
     * `:ignore_cache` - if `true`, the cache is ignored, if `false` it's not.
       Defaults to `true`.
     * `:load_tombstones` - if `true`, information about deleted records is
@@ -230,11 +277,16 @@ defmodule MarcoPolo do
       version specified in the `:version` option is not the latest. If this
       option is present, the `:version` option is required. This functionality
       is supported in OrientDB >= 2.1.
+    * `:version` - see the `:if_version_not_latest` option.
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
       iex> rid = %MarcoPolo.RID{cluster_id: 10, position: 184}
-      iex> {:ok, [record]} = MarcoPolo.load_record(conn, rid, "*:-1")
+      iex> {:ok, [record]} = MarcoPolo.load_record(conn, rid)
       iex> record.fields
       %{"foo" => "bar"}
 
@@ -284,6 +336,10 @@ defmodule MarcoPolo do
       without waiting for a response. This performs a *fire and forget*
       operation, returning `:ok` every time.
 
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
+
   ## Examples
 
       iex> rid = %MarcoPolo.RID{cluster_id: 1, position: 10}
@@ -315,8 +371,18 @@ defmodule MarcoPolo do
   Deletes a record from the database to which `conn` is connected.
 
   The record to delete is identified by `rid`; version `version` is
-  deleted. Returns `{:ok, deleted?}` where `deleted?` is a boolean that tells
-  whether the record has been deleted.
+  deleted. Returns `{:ok, deleted?}` where `deleted?` is a boolean that tells if
+  the record has been deleted.
+
+  This function accepts the following options:
+
+    * `:no_response` - if `true`, send the request to the OrientDB server
+      without waiting for a response. This performs a *fire and forget*
+      operation, returning `:ok` every time.
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
@@ -371,6 +437,10 @@ defmodule MarcoPolo do
   `{:ok, [cluster_id]}` is returned where `cluster_id` is the id of the newly
   created cluster.
   query.
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
@@ -427,6 +497,10 @@ defmodule MarcoPolo do
   **Note**: for this to work, scripting must be enabled in the server
   configuration. You can read more about scripting in the [OrientDB
   docs](http://orientdb.com/docs/last/Javascript-Command.html#Enable_Server_side_scripting).
+
+  This operation can only be performed on connections to a database. To learn
+  more about the connection type, look at the "Connection type" section in the
+  docs for the `MarcoPolo` module.
 
   ## Examples
 
