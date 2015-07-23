@@ -1,4 +1,36 @@
 defmodule MarcoPolo do
+  @moduledoc """
+  Main API for interfacing with OrientDB.
+
+  This module provides functions to connect to a running OrientDB server and to
+  perform commands on it.
+
+  A connection to OrientDB can be established using the `start_link/1` function
+  and stoppped with `stop/1`.
+
+  ## Connection type
+
+  OrientDB makes a distinction between *server operations* and *database
+  operations*. Server operations are operations that are performed at server
+  level: examples of these operations are checking if a database exists or
+  creating a new database. Database operations have to be performed inside a
+  database: examples of such operations are inserting a new record or getting
+  the number of records in the database.
+
+  Server and database operations can only be performed by the appropriate
+  connection: a connection to the server can perform **only** server operations,
+  while a connection to a database can perform **only** database operations. The
+  connection type is chosen when the connection is started via `start_link/1`.
+
+  ## Examples
+
+      conn_type = {:db, "GratefulDeadConcerts", :document}
+      {:ok, conn} = MarcoPolo.start_link(user: "admin", password: "admin", connection: conn_type)
+      MarcoPolo.command(conn, "SELECT FROM OUser")
+      #=> {:ok, [...users...]}
+
+  """
+
   alias MarcoPolo.Connection, as: C
   alias MarcoPolo.RID
   alias MarcoPolo.Document
