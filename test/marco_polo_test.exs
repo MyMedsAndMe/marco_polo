@@ -156,12 +156,19 @@ defmodule MarcoPoloTest do
       :ok = MarcoPolo.create_record(c, cluster_id, record, no_response: true)
     end
 
-    test "update_record/6", %{conn: c} do
+    test "update_record/6 synchronously", %{conn: c} do
       rid = TestHelpers.record_rid("record_update")
       new_doc = %Document{class: "Schemaless", fields: %{f: "bar"}}
 
       assert {:ok, new_version} = MarcoPolo.update_record(c, rid, 1, new_doc, true)
       assert is_integer(new_version)
+    end
+
+    test "update_record/6 asynchronously (:no_response option)", %{conn: c} do
+      rid = TestHelpers.record_rid("record_update")
+      new_doc = %Document{class: "Schemaless", fields: %{f: "baz"}}
+
+      assert :ok = MarcoPolo.update_record(c, rid, 1, new_doc, true, no_response: true)
     end
 
     test "command/3: SELECT query without a WHERE clause", %{conn: c} do
