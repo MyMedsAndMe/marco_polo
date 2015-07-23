@@ -62,8 +62,9 @@ defmodule MarcoPolo.Connection.Auth do
 
   defp op_and_args_from_connection_type(user, password, :server),
     do: {:connect, [user, password]}
-  defp op_and_args_from_connection_type(user, password, {:db, name, type}),
-    do: {:db_open, [name, type, user, password]}
+  defp op_and_args_from_connection_type(user, password, {:db, name, type})
+    when type in [:document, :graph],
+    do: {:db_open, [name, Atom.to_string(type), user, password]}
 
   defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
     case :gen_tcp.recv(socket, 0, opts[:timeout] || @timeout) do

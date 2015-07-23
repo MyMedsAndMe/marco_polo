@@ -70,7 +70,7 @@ defmodule MarcoPoloTest do
 
     setup do
       {:ok, conn} = MarcoPolo.start_link(
-        connection: {:db, "MarcoPoloTest", "document"},
+        connection: {:db, "MarcoPoloTest", :document},
         user: TestHelpers.user(),
         password: TestHelpers.password()
       )
