@@ -502,7 +502,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # http://orientdb.com/docs/last/Types.html
   @types [
     {:boolean, "BOOLEAN", 0},
-    {:int, "INT", 1},
+    {:int, "INTEGER", 1},
     {:short, "SHORT", 2},
     {:long, "LONG", 3},
     {:float, "FLOAT", 4},
