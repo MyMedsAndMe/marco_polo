@@ -103,5 +103,11 @@ to that number of links. For example:
 </properties>
 ```
 
+## Contributing
+
+For more information on how to contribute to MarcoPolo (including how to clone
+the repository and run tests), have a look at the
+[CONTRIBUTING](CONTRIBUTING.md) file.
+
 [docs]: http://hexdocs.pm/marco_polo
 [decimal]: https://github.com/ericmj/decimal
