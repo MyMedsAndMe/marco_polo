@@ -149,6 +149,9 @@ defmodule MarcoPoloMiscTest do
 
     assert {:ok, [edge]} = command(c, "CREATE EDGE Eat FROM ? to ?", params: [jane.rid, pizza_place.rid])
 
+    assert edge.fields["in"] == pizza_place.rid
+    assert edge.fields["out"] == jane.rid
+
     assert {:ok, [doc]} = command(c, "SELECT IN() FROM Restaurant WHERE name = 'Pizza place'")
     assert doc.fields["IN"] == {:link_list, [jane.rid]}
 
