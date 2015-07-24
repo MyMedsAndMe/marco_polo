@@ -23,9 +23,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   def decode(data, schema \\ %{}) do
     <<_serialization_version, rest :: binary>> = data
 
+    # OrientDB sometimes sends stuff after a record that they use to keep track
+    # of updates and other things. Let's ignore this stuff and hope everything
+    # goes fine, shall we?
     case decode_embedded(rest, schema) do
-      {record, <<>>}       -> record
-      :unknown_property_id -> :unknown_property_id
+      {record, _cruft} ->
+        record
+      :unknown_property_id ->
+        :unknown_property_id
     end
   end
 
@@ -260,7 +265,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {{:link_bag, rids}, rest}
   end
 
-  def decode_type(_, :link_bag, _) do
+  def decode_type(<<0, _ :: binary>>, :link_bag, _) do
     raise MarcoPolo.Error, """
     Tree-based RidBags are not supported by MarcoPolo (yet); only embedded
     RidBags are. You can change your OrientDB server configuration to force
