@@ -369,6 +369,50 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value({:link_bag, rids})) == data
   end
 
+  test "decoding a real world record" do
+    global_properties = %{
+      72 => {"content", "EMBEDDEDMAP"},
+      48 => {"short_name", "STRING"},
+      148 => {"created_at", "DATETIME"},
+      149 => {"update_at", "DATETIME"},
+    }
+
+    data = <<0, # version
+             10, 80, 97, 110, 101, 108, # class ('Panel')
+             145, 1, 0, 0, 0, 40, # property with id 72
+             97, 0, 0, 0, 73, # property with id 48
+             171, 2, 0, 0, 0, 0, # property with id 148
+             169, 2, 0, 0, 0, 0, # property with id 149
+             6, 105, 110, 95, 0, 0, 0, 88, 22, # named field ('in_', a LINKBAG)
+             0, # end of header
+
+             # embedded map
+             2,
+             7, 10, 108, 97, 98, 101, 108, 0, 0, 0, 53,
+             7, 38, 89, 111, 117, 114, 32, 67, 117, 114, 114, 101, 110,
+               116, 32, 83, 116, 97, 116, 117, 115,
+
+             # string
+             28, 99, 117, 114, 114, 101, 110, 116, 95, 115, 116, 97, 116, 117, 115,
+
+             # two nil datetimes
+
+             # a linkbag (embedded)
+             1, 0, 0, 0, 1,
+               0, 47, 0, 0, 0, 0, 0, 0, 0, 0,
+               0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>
+
+    fields = %{
+      "content" => %{"label" => "Your Current Status"},
+      "short_name" => "current_status",
+      "created_at" => nil,
+      "update_at" => nil,
+      "in_" => {:link_bag, [%RID{cluster_id: 47, position: 0}]},
+    }
+    document = %Document{class: "Panel", version: nil, rid: nil, fields: fields}
+    assert Ser.decode(data, %{global_properties: global_properties}) == document
+  end
+
   defp bin(iodata) do
     IO.iodata_to_binary(iodata)
   end
