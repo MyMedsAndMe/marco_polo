@@ -6,17 +6,29 @@ defmodule MarcoPoloTest do
   alias MarcoPolo.Document
   alias MarcoPolo.BinaryRecord
 
-  test "start_link/1: not specifying a connection type raises an error" do
-    msg = "no connection type (connect/db_open) specified"
-    assert_raise ArgumentError, msg, fn ->
-      MarcoPolo.start_link
-    end
+  test "start_link/1: raises if no connection type is specified" do
+    Logger.remove_backend(:console, flush: true)
+    Process.flag :trap_exit, true
+
+    {:ok, pid} = MarcoPolo.start_link user: "foo", password: "foo", debug: {:log_to_file, "/dev/null"}
+
+    assert_receive {:EXIT, ^pid, {error, _}}
+    assert Exception.message(error) =~ "key :connection not found"
+
+    Logger.add_backend(:console, flush: true)
   end
 
-  test "start_link/1: always returns {:ok, pid}" do
-    assert {:ok, pid} = MarcoPolo.start_link(connection: :server)
-    assert is_pid(pid)
-    assert :ok = MarcoPolo.stop(pid)
+  test "start_link/1: raises if the connection type is unknown" do
+    Process.flag :trap_exit, true
+    Logger.remove_backend(:console, flush: true)
+    {:ok, pid} = MarcoPolo.start_link(user: "foo", password: "foo", connection: :foo)
+
+    assert_receive {:EXIT, ^pid, {error, _}}
+
+    msg = "invalid connection type, valid ones are :server or {:db, name, type}"
+    assert Exception.message(error) == msg
+
+    Logger.add_backend(:console, flush: true)
   end
 
   defmodule ConnectedToServer do

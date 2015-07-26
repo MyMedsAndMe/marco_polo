@@ -65,6 +65,10 @@ defmodule MarcoPolo.Connection.Auth do
   defp op_and_args_from_connection_type(user, password, {:db, name, type})
     when type in [:document, :graph],
     do: {:db_open, [name, Atom.to_string(type), user, password]}
+  defp op_and_args_from_connection_type(_user, _password, {:db, _, type}),
+    do: raise(ArgumentError, "unknown database type: #{inspect type}, valid ones are :document, :graph")
+  defp op_and_args_from_connection_type(_user, _password, _),
+    do: raise(ArgumentError, "invalid connection type, valid ones are :server or {:db, name, type}")
 
   defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
     case :gen_tcp.recv(socket, 0, opts[:timeout] || @timeout) do
