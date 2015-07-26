@@ -158,4 +158,9 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, [doc]} = command(c, "SELECT OUT() FROM Person WHERE name = 'Jane'")
     assert doc.fields["OUT"] == {:link_list, [pizza_place.rid]}
   end
+
+  test "nested queries", %{conn: c} do
+    assert {:ok, [%Document{} = doc]} = command(c, "SELECT * FROM (SELECT * FROM Schemaless) WHERE name = 'record_load'")
+    assert doc.fields["name"] == "record_load"
+  end
 end
