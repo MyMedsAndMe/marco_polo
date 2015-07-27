@@ -60,6 +60,8 @@ defmodule MarcoPolo do
 
   @type rec :: Document.t | BinaryRecord.t
 
+  @type tx_operation :: {:create | :update | :delete, rec}
+
   @doc """
   Starts the connection with an OrientDB server.
 
@@ -631,6 +633,43 @@ defmodule MarcoPolo do
     end
   end
 
+  @doc """
+  Runs operations inside a transaction on the database to which `conn` is
+  connected.
+
+  This function will run a list of `operations` inside a server-side
+  transaction. Operations can be creations, updates and deletions of
+  records. Each operation has the form:
+
+      {op_type, record}
+
+  where `op_type` can be one of `:create`, `:update` or `:delete`.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:using_tx_log` - tells the server whether to use the transaction log to
+      recover the transaction or not. Defaults to `true`. *Note*: disabling the
+      log could speed up the execution of the transaction, but it makes
+      impossible to rollback the transaction in case of errors. This could lead
+      to inconsistencies in indexes as well, since in case of duplicated keys
+      the rollback is not called to restore the index status.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
+
+  ## Examples
+
+      iex> ops = [{:create, %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}}},
+      ...>        {:delete, %MarcoPolo.Document{rid: %MarcoPolo.RID{cluster_id: 1, position: 2}}]
+      iex> {:ok, %{created: created, updated: []} = MarcoPolo.transaction(conn, ops)
+      iex> created
+      %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}, rid: %MarcoPolo.RID{...}}
+
+  """
+  @spec transaction(pid, [tx_operation], Keyword.t) ::
+    {:ok, %{created: [{RID.t, non_neg_integer}], updated: [{RID.t, non_neg_integer}]}} |
+    {:error, term}
   def transaction(conn, operations, opts \\ []) do
     # This is horrible :(. But OrientDB is evil: it wants you to assign a
     # temporary id to each record you want to create (cluster id has to be -1,
