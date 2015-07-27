@@ -309,7 +309,12 @@ defmodule MarcoPolo.Protocol do
 
     parsers = [created_parser, updated_parser, &parse_collection_changes/1]
 
-    GP.parse(data, parsers)
+    case GP.parse(data, parsers) do
+      :incomplete ->
+        :incomplete
+      {[created, updated, _coll_changes], rest} ->
+        {build_resp_to_tx_commit(created, updated), rest}
+    end
   end
 
   defp parse_resp_to_record_load(<<1, rest :: binary>>, acc, schema) do
@@ -443,6 +448,38 @@ defmodule MarcoPolo.Protocol do
     ]
 
     GP.parse(data, GP.array_parser(&decode_term(&1, :int), array_elem_parsers))
+  end
+
+  defp build_resp_to_tx_commit(created, updated) do
+    # This function assumes that the temporary ids assigned to the record to
+    # create have been assigned sequentially: -2, -3, -4 and so on. This
+    # information is used to order the created rids that occur in the response.
+
+    created = Enum.map created, fn([-1, client_id, cluster_id, pos]) ->
+      # The version is 0 by default, if it's not 0 then the record will appear
+      # in the updated list too with the right version. The rest of this
+      # function will update the version.
+      {client_id, {%RID{cluster_id: cluster_id, position: pos}, 0}}
+    end
+
+    acc = {[], created}
+    {updated, created} = Enum.reduce updated, acc, fn([cid, pos, vsn], {updated, created}) ->
+      rid = %RID{cluster_id: cid, position: pos}
+
+      if index = Enum.find_index(created, &match?({_, {^rid, 0}}, &1)) do
+        new_created = List.update_at(created, index, fn({client_id, _}) -> {client_id, {rid, vsn}} end)
+        {updated, new_created}
+      else
+        {[{rid, vsn}|updated], created}
+      end
+    end
+
+    created =
+      created
+      |> Enum.sort_by(fn({client_id, rid_and_vsn}) -> - client_id end)
+      |> Enum.map(fn({_client_id, rid_and_vsn}) -> rid_and_vsn end)
+
+    %{created: created, updated: Enum.reverse(updated)}
   end
 
   defp req_code(:shutdown),                          do: 1
