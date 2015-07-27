@@ -476,8 +476,8 @@ defmodule MarcoPolo.Protocol do
 
     created =
       created
-      |> Enum.sort_by(fn({client_id, rid_and_vsn}) -> - client_id end)
-      |> Enum.map(fn({_client_id, rid_and_vsn}) -> rid_and_vsn end)
+      |> Enum.sort_by(fn({client_id, _}) -> - client_id end)
+      |> Enum.map(fn({_, rid_and_vsn}) -> rid_and_vsn end)
 
     %{created: created, updated: Enum.reverse(updated)}
   end
