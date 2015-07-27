@@ -79,6 +79,10 @@ defmodule MarcoPolo do
     * `:port` - (integer) the port where the OrientDB server is running.
       Defaults to `2424`.
 
+  It also accepts all options that `GenServer.start_link/3` accepts (e.g.,
+  `:name` for registering the new process or `:timeout` for providing a
+  connection timeout).
+
   ## Examples
 
   Connecting to the server:
@@ -124,6 +128,13 @@ defmodule MarcoPolo do
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
 
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
+
   ## Examples
 
       iex> MarcoPolo.db_exists?(conn, "GratefulDeadConcerts", :plocal)
@@ -142,6 +153,13 @@ defmodule MarcoPolo do
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   ## Examples
 
@@ -166,6 +184,13 @@ defmodule MarcoPolo do
   This operation can only be performed on connections to the server. To learn
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   ## Examples
 
@@ -196,6 +221,13 @@ defmodule MarcoPolo do
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
 
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
+
   ## Examples
 
       iex> MarcoPolo.drop_db(conn, "UselessDatabase", :memory)
@@ -217,6 +249,13 @@ defmodule MarcoPolo do
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
 
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
+
   ## Examples
 
       iex> MarcoPolo.db_size(conn)
@@ -234,6 +273,13 @@ defmodule MarcoPolo do
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   ## Examples
 
@@ -256,11 +302,15 @@ defmodule MarcoPolo do
   the rid of the newly created record and `version` is the version of the newly
   created record.
 
+  ## Options
+
   This function accepts the following options:
 
     * `:no_response` - if `true`, send the request to the OrientDB server
       without waiting for a response. This performs a *fire and forget*
       operation, returning `:ok` every time.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
@@ -293,7 +343,9 @@ defmodule MarcoPolo do
   The record to load is identified by `rid`. Since multiple records could be returned,
   the return value is `{:ok, list_of_records}`.
 
-  This function accepts a list of options:
+  ## Options
+
+  This function accepts the following options:
 
     * `:fetch_plan` - the [fetching
       strategy](http://orientdb.com/docs/last/Fetching-Strategies.html) used to
@@ -307,6 +359,8 @@ defmodule MarcoPolo do
       option is present, the `:version` option is required. This functionality
       is supported in OrientDB >= 2.1.
     * `:version` - see the `:if_version_not_latest` option.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
@@ -359,11 +413,15 @@ defmodule MarcoPolo do
 
   When the update is successful, `{:ok, new_version}` is returned.
 
+  ## Options
+
   This function accepts the following options:
 
     * `:no_response` - if `true`, send the request to the OrientDB server
       without waiting for a response. This performs a *fire and forget*
       operation, returning `:ok` every time.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
@@ -403,11 +461,15 @@ defmodule MarcoPolo do
   deleted. Returns `{:ok, deleted?}` where `deleted?` is a boolean that tells if
   the record has been deleted.
 
+  ## Options
+
   This function accepts the following options:
 
     * `:no_response` - if `true`, send the request to the OrientDB server
       without waiting for a response. This performs a *fire and forget*
       operation, returning `:ok` every time.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
@@ -447,6 +509,8 @@ defmodule MarcoPolo do
   the text in `query`. As of now, `SELECT` and `TRAVERSE` operations are
   idempotent while all other operations are non-idempotent.
 
+  ## Options
+
   The options that this function accepts depend in part on the type of the operation.
 
   The options shared by both idempotent and non-idempotent operations are the following:
@@ -454,11 +518,15 @@ defmodule MarcoPolo do
     * `:params` - a map of params with atoms or strings as keys and any
       encodable term as values. These parameters are used by OrientDB to build
       prepared statements as you can see in the examples below. Defaults to `%{}`.
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   The additional options for idempotent (e.g., `SELECT`) queries are:
 
     * `:fetch_plan`: a string specifying the fetch plan. Mandatory for `SELECT`
       queries.
+
+  ## Return value
 
   If the query is successful then the return value is an `{:ok, values}` tuple
   where `values` strictly depends on the performed query. Usually, `values` is a
@@ -530,6 +598,13 @@ defmodule MarcoPolo do
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
 
   ## Examples
 
