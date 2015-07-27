@@ -163,4 +163,38 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, [%Document{} = doc]} = command(c, "SELECT * FROM (SELECT * FROM Schemaless) WHERE name = 'record_load'")
     assert doc.fields["name"] == "record_load"
   end
+
+  test "transactions", %{conn: c} do
+    {:ok, cluster_id} =
+      command(c, "CREATE CLASS TransactionsTest")
+    {:ok, [doc1, doc2, doc3]} =
+      command(c, "INSERT INTO TransactionsTest(f) VALUES (1), (2), (3)")
+
+    doc2 = %{doc2 | fields: Map.update!(doc2.fields, "f", &(&1 * 100))}
+
+    operations = [
+      {:create, %Document{class: "TransactionsTest", fields: %{"f" => 4}}},
+      {:update, doc2},
+      {:create, %Document{class: "TransactionsTest", fields: %{"f" => 5}}},
+      {:delete, doc3},
+    ]
+
+    assert {:ok, %{created: created, updated: updated}} = transaction(c, operations)
+
+    assert [{%RID{cluster_id: ^cluster_id}, _}, {%RID{cluster_id: ^cluster_id}, _}]
+           = created
+    assert [{%RID{cluster_id: ^cluster_id}, _}] = updated
+
+    # Let's check the created records have actually been created.
+    assert {:ok, [_, _]}
+           = command(c, "SELECT FROM TransactionsTest WHERE f = 4 OR f = 5")
+
+    # Let's check the record to update has been updated.
+    assert {:ok, [_updated_doc]}
+           = command(c, "SELECT FROM TransactionsTest WHERE f = 200")
+
+    # Let's check that doc3 has been deleted since OrientDB doesn't send an ack
+    # for deletions in transactions.
+    assert {:ok, []} = command(c, "SELECT FROM TransactionsTest WHERE f = 3")
+  end
 end

@@ -3,6 +3,7 @@ defmodule MarcoPoloTest do
   @moduletag :integration
 
   alias MarcoPolo.Error
+  alias MarcoPolo.RID
   alias MarcoPolo.Document
   alias MarcoPolo.BinaryRecord
 
@@ -239,6 +240,21 @@ defmodule MarcoPoloTest do
       assert {:ok, true} = command(c, "DROP CLASS MiscTests")
       assert {:ok, true} = command(c, "DROP CLUSTER misc_tests")
       assert {:ok, false} = command(c, "DROP CLUSTER misc_tests")
+    end
+
+    test "transaction/3: creating records", %{conn: c} do
+      cluster_id = TestHelpers.cluster_id("schemaless")
+
+      operations = [
+        {:create, %Document{class: "Schemaless", fields: %{"name" => "inside_transaction"}}},
+        {:create, %BinaryRecord{contents: <<1, 2, 3>>}},
+      ]
+
+      assert {:ok, %{created: created, updated: []}} = MarcoPolo.transaction(c, operations)
+
+      assert [{%RID{cluster_id: ^cluster_id}, v1}, {%RID{}, v2}] = created
+      assert is_integer(v1)
+      assert is_integer(v2)
     end
 
     @tag :scripting

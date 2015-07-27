@@ -293,6 +293,25 @@ defmodule MarcoPolo.Protocol do
     parse_resp_to_command(data, schema)
   end
 
+  defp parse_resp_contents(:tx_commit, data, _) do
+    created_parser = GP.array_parser(&decode_term(&1, :int), [
+      &decode_term(&1, :short), # client cluster id
+      &decode_term(&1, :long), # client cluster position
+      &decode_term(&1, :short), # cluster id
+      &decode_term(&1, :long), # cluster position
+    ])
+
+    updated_parser = GP.array_parser(&decode_term(&1, :int), [
+      &decode_term(&1, :short), # updated cluster id
+      &decode_term(&1, :long), # updated cluster position
+      &decode_term(&1, :int), # new record version
+    ])
+
+    parsers = [created_parser, updated_parser, &parse_collection_changes/1]
+
+    GP.parse(data, parsers)
+  end
+
   defp parse_resp_to_record_load(<<1, rest :: binary>>, acc, schema) do
     parsers = [
       &decode_term(&1, :byte),  # type

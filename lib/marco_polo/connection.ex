@@ -20,6 +20,7 @@ defmodule MarcoPolo.Connection do
     queue: :queue.new,
     schema: nil,
     tail: "",
+    transaction_id: 1,
   }
 
   ## Client code.
@@ -137,7 +138,7 @@ defmodule MarcoPolo.Connection do
 
     # Backoff 0 to churn through all commands in mailbox before reconnecting,
     # https://github.com/ericmj/mongodb/blob/a2dba1dfc089960d87364c2c43892f3061a93924/lib/mongo/connection.ex#L210
-    {:backoff, 0, %{s | socket: nil, queue: :queue.new}}
+    {:backoff, 0, %{s | socket: nil, queue: :queue.new, transaction_id: 1}}
   end
 
   @doc false
@@ -145,6 +146,14 @@ defmodule MarcoPolo.Connection do
   # client.
   def handle_call(_call, _from, %{socket: nil} = s) do
     {:reply, {:error, :closed}, s}
+  end
+
+  # We have to handle the :tx_commit operation differently as we have to keep
+  # track of the transaction id, which is kept in the state of this genserver
+  # (we also have to update this id).
+  def handle_call({:operation, :tx_commit, [:transaction_id|args]}, from, s) do
+    {id, s} = next_transaction_id(s)
+    handle_call({:operation, :tx_commit, [id|args]}, from, s)
   end
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
@@ -288,5 +297,9 @@ defmodule MarcoPolo.Connection do
 
   defp do_check_op_is_allowed!(_, _) do
     nil
+  end
+
+  defp next_transaction_id(s) do
+    get_and_update_in(s.transaction_id, &{&1, &1 + 1})
   end
 end

@@ -49,6 +49,12 @@ defmodule MarcoPolo do
     no_response: {:raw, <<2>>},
   }
 
+  @tx_operation_types %{
+    update: 1,
+    delete: 2,
+    create: 3,
+  }
+
   @type db_type :: :document | :graph
   @type storage_type :: :plocal | :memory
 
@@ -280,9 +286,6 @@ defmodule MarcoPolo do
       end
     end
   end
-
-  defp record_type(%Document{}), do: {:raw, "d"}
-  defp record_type(%BinaryRecord{}), do: {:raw, "b"}
 
   @doc """
   Loads a record from the database to which `conn` is connected.
@@ -553,6 +556,44 @@ defmodule MarcoPolo do
     end
   end
 
+  def transaction(conn, operations, opts \\ []) do
+    # This is horrible :(. But OrientDB is evil: it wants you to assign a
+    # temporary id to each record you want to create (cluster id has to be -1,
+    # position has to be a transaction-unique integer < -1). When it returns
+    # rids for the created records, instead of returning them in order (not sure
+    # why) they return {client_rid, actual_rid} couples so you manually have to
+    # say "ok this record got assigned this rid" based on the client rids you
+    # assigned.
+    #
+    # Here, we keep a map client_id => record that we'll pass to
+    # `build_resp_to_tx_commit/3` later.
+    acc = {%{}, -2}
+    {op_args, {client_ids_to_records, _index}} = Enum.flat_map_reduce operations, acc, fn
+      {:create, record} = op, {client_ids_to_records, i} ->
+        client_ids_to_records = Map.put_new(client_ids_to_records, i, record)
+        {args_from_tx_operation(op, i, opts), {client_ids_to_records, i - 1}}
+      op, acc ->
+        {args_from_tx_operation(op, 0, opts), acc}
+    end
+
+    # The 0 at the end signals the end of the record list, while the empty
+    # binary is there because OrientDB :). It has to do with index changes, and
+    # it's not in the docs because OrientDB :).
+    args = [:transaction_id, opts[:using_tx_log] || true]
+      ++ op_args
+      ++ [{:raw, <<0>>}, <<>>]
+
+    # We have to do this here (and not in MarcoPolo.Protocol, like the rest of
+    # the operations) because we want to map back client rids to actual rids as
+    # described in the comment at the beginning of this function. It's a mess.
+    case C.operation(conn, :tx_commit, args, opts) do
+      {:ok, [created, updated, _coll_changes]} ->
+        {:ok, build_resp_to_tx_commit(created, updated)}
+      o ->
+        o
+    end
+  end
+
   defp encode_query_with_type(:sql_query, query, opts) do
     args = [query,
             -1,
@@ -614,4 +655,74 @@ defmodule MarcoPolo do
 
     String.downcase(command)
   end
+
+  defp args_from_tx_operation({:create, record}, incr_position, _opts) do
+    # -1 is the cluster id for the record that doesn't exist yet. OrientDB wants
+    # -it this way.
+    [
+      {:raw, <<1>>}, # continue to read records
+      {:raw, <<@tx_operation_types.create>>},
+      {:short, -1},
+      {:long, incr_position},
+      record_type(record),
+      record,
+    ]
+  end
+
+  defp args_from_tx_operation({:update, %{__struct__: _, rid: %RID{} = rid} = record}, _incr_position, opts) do
+    [
+      {:raw, <<1>>}, # continue to read records
+      {:raw, <<@tx_operation_types.update>>},
+      {:short, rid.cluster_id},
+      {:long, rid.position},
+      record_type(record),
+      {:int, record.version},
+      record,
+      opts[:update_content] || true,
+    ]
+  end
+
+  defp args_from_tx_operation({:delete, %{__struct__: _, rid: %RID{} = rid} = record}, _incr_position, _opts) do
+    [
+      {:raw, <<1>>}, # continue to read records
+      {:raw, <<@tx_operation_types.delete>>},
+      {:short, rid.cluster_id},
+      {:long, rid.position},
+      record_type(record),
+      {:int, record.version},
+    ]
+  end
+
+  defp build_resp_to_tx_commit(created, updated) do
+    # The first two ignored elements are the *client* cluster id and position
+    # (used in the transaction, clsuter id is -1).
+    created = Enum.map created, fn([_, client_id, cluster_id, pos]) ->
+      # The version is 0 by default, if it's not 0 then the record will appear
+      # in the updated list too with the right version. The rest of this
+      # function will updated the version in `created`.
+      {client_id, {%RID{cluster_id: cluster_id, position: pos}, 0}}
+    end
+
+    acc = {[], created}
+    {updated, created} = Enum.reduce updated, acc, fn([cid, pos, vsn], {updated, created}) ->
+      rid = %RID{cluster_id: cid, position: pos}
+
+      if index = Enum.find_index(created, &match?({_, {^rid, 0}}, &1)) do
+        new_created = List.update_at(created, index, fn({client_id, _}) -> {client_id, {rid, vsn}} end)
+        {updated, new_created}
+      else
+        {[{rid, vsn}|updated], created}
+      end
+    end
+
+    created =
+      created
+      |> Enum.sort_by(fn({client_id, rid_and_vsn}) -> - client_id end)
+      |> Enum.map(fn({_client_id, rid_and_vsn}) -> rid_and_vsn end)
+
+    %{created: created, updated: Enum.reverse(updated)}
+  end
+
+  defp record_type(%Document{}), do: {:raw, "d"}
+  defp record_type(%BinaryRecord{}), do: {:raw, "b"}
 end
