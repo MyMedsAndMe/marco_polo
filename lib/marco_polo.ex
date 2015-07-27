@@ -671,16 +671,6 @@ defmodule MarcoPolo do
     {:ok, %{created: [{RID.t, non_neg_integer}], updated: [{RID.t, non_neg_integer}]}} |
     {:error, term}
   def transaction(conn, operations, opts \\ []) do
-    # This is horrible :(. But OrientDB is evil: it wants you to assign a
-    # temporary id to each record you want to create (cluster id has to be -1,
-    # position has to be a transaction-unique integer < -1). When it returns
-    # rids for the created records, instead of returning them in order (not sure
-    # why) they return {client_rid, actual_rid} couples so you manually have to
-    # say "ok this record got assigned this rid" based on the client rids you
-    # assigned.
-    #
-    # Here, we keep a map client_id => record that we'll pass to
-    # `build_resp_to_tx_commit/3` later.
     {op_args, _index} = Enum.flat_map_reduce operations, -2, fn
       {:create, _} = op, i ->
         {args_from_tx_operation(op, i, opts), i - 1}
