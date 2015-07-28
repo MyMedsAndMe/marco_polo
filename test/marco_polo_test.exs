@@ -185,7 +185,7 @@ defmodule MarcoPoloTest do
     end
 
     test "command/3: SELECT query without a WHERE clause", %{conn: c} do
-      {:ok, records} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:-1")
+      {:ok, {records, []}} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:0")
 
       assert Enum.find(records, fn record ->
         assert %Document{} = record
@@ -199,7 +199,7 @@ defmodule MarcoPoloTest do
       cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
       res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
 
-      assert {:ok, [%Document{} = record]} = res
+      assert {:ok, {[%Document{} = record], _linked}} = res
       assert record.fields["name"] == "record_load"
     end
 
@@ -208,7 +208,7 @@ defmodule MarcoPoloTest do
       params = %{"name" => "record_load"}
       res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
 
-      assert {:ok, [%Document{} = record]} = res
+      assert {:ok, {[%Document{} = record], _linked}} = res
       assert record.fields["name"] == "record_load"
     end
 
@@ -217,7 +217,7 @@ defmodule MarcoPoloTest do
       params = ["record_load", "foo"]
       res = MarcoPolo.command(c, cmd, params: params)
 
-      assert {:ok, [%Document{} = doc]} = res
+      assert {:ok, {[%Document{} = doc], _linked}} = res
       assert doc.fields["name"] == "record_load"
       assert doc.fields["f"] == "foo"
     end
@@ -225,7 +225,7 @@ defmodule MarcoPoloTest do
     test "command/3: INSERT query inserting multiple records", %{conn: c} do
       cmd = "INSERT INTO Schemaless(my_field) VALUES ('value1'), ('value2')"
 
-      assert {:ok, [r1, r2]} = MarcoPolo.command(c, cmd)
+      assert {:ok, {[r1, r2], _linked}} = MarcoPolo.command(c, cmd)
       assert r1.fields["my_field"] == "value1"
       assert r2.fields["my_field"] == "value2"
     end
@@ -233,13 +233,13 @@ defmodule MarcoPoloTest do
     test "command/3: miscellaneous commands", %{conn: c} do
       import MarcoPolo, only: [command: 2, command: 3]
 
-      assert {:ok, _cluster_id}  = command(c, "CREATE CLUSTER misc_tests")
-      assert {:ok, _} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
-      assert {:ok, _property_id} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
-      assert {:ok, nil} = command(c, "DROP PROPERTY MiscTests.foo")
-      assert {:ok, true} = command(c, "DROP CLASS MiscTests")
-      assert {:ok, true} = command(c, "DROP CLUSTER misc_tests")
-      assert {:ok, false} = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, {_cluster_id, _linked}}  = command(c, "CREATE CLUSTER misc_tests")
+      assert {:ok, {_, _linked}} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+      assert {:ok, {_property_id, _linked}} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
+      assert {:ok, {nil, _linked}} = command(c, "DROP PROPERTY MiscTests.foo")
+      assert {:ok, {true, _linked}} = command(c, "DROP CLASS MiscTests")
+      assert {:ok, {true, _linked}} = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, {false, _linked}} = command(c, "DROP CLUSTER misc_tests")
     end
 
     test "transaction/3: creating records", %{conn: c} do
@@ -269,7 +269,7 @@ defmodule MarcoPoloTest do
 
       assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
 
-      {:ok, records} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
+      {:ok, {records, _linked}} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
       records = Enum.map(records, fn(%Document{fields: %{"foo" => value}}) -> value end)
 
       assert records == ~w(test1 test2 test3)

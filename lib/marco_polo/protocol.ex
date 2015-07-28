@@ -290,7 +290,14 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:command, data, schema) do
-    parse_resp_to_command(data, schema)
+    case parse_resp_to_command(data, schema) do
+      {{:unknown_property_id, _}, rest} ->
+        {:unknown_property_id, rest}
+      :incomplete ->
+        :incomplete
+      o ->
+        o
+    end
   end
 
   defp parse_resp_contents(:tx_commit, data, _) do
@@ -355,42 +362,37 @@ defmodule MarcoPolo.Protocol do
   @single_record     ?r
   @serialized_result ?a
 
-  defp parse_resp_to_command(<<type, data :: binary>>, schema)
-      when type in [@list, @set] do
-    parsers = [GP.array_parser(&decode_term(&1, :int), &parse_record_with_rid(&1, schema)),
-               &decode_term(&1, :byte)]
+  defp parse_resp_to_command(<<type, data :: binary>>, schema) when type in [@list, @set] do
+    parser = GP.array_parser(&decode_term(&1, :int), &parse_record_with_rid(&1, schema))
 
-    case GP.parse(data, parsers) do
-      # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
-      # mentioned in the docs :(
-      {[records, 0], rest} -> {records, rest}
-      _                    -> :incomplete
+    case GP.parse(data, parser) do
+      {records, rest} ->
+        parse_linked_records(records, rest, schema)
+      _ ->
+        :incomplete
     end
   end
 
   defp parse_resp_to_command(<<@single_record, rest :: binary>>, schema) do
-    case GP.parse(rest, [&parse_record_with_rid(&1, schema), &decode_term(&1, :byte)]) do
-      # TODO find out why OrientDB shoves a 0 byte at the end of this list, not
-      # mentioned in the docs :(
-      {[record, 0], rest} -> {record, rest}
-      :incomplete         -> :incomplete
+    case GP.parse(rest, &parse_record_with_rid(&1, schema)) do
+      {record, rest} ->
+        parse_linked_records(record, rest, schema)
+      :incomplete ->
+        :incomplete
     end
   end
 
-  defp parse_resp_to_command(<<@serialized_result, rest :: binary>>, _) do
-    case GP.parse(rest, [&decode_term(&1, :bytes), &decode_term(&1, :byte)]) do
-      # TODO find out why OrientDB shoves a 0 byte at the end of this binary
-      # dump, not mentioned in the docs :(
-      {[binary, 0], rest} -> {CSVTypes.decode(binary), rest}
-      :incomplete         -> :incomplete
+  defp parse_resp_to_command(<<@serialized_result, rest :: binary>>, schema) do
+    case GP.parse(rest, &decode_term(&1, :bytes)) do
+      {binary, rest} ->
+        parse_linked_records(CSVTypes.decode(binary), rest, schema)
+      :incomplete ->
+        :incomplete
     end
   end
 
-  defp parse_resp_to_command(<<@null_result, rest :: binary>>, _) do
-    # TODO find out why OrientDB shoves a 0 byte at the end of this binary
-    # dump, not mentioned in the docs :(
-    <<0, rest :: binary>> = rest
-    {nil, rest}
+  defp parse_resp_to_command(<<@null_result, rest :: binary>>, schema) do
+    parse_linked_records(nil, rest, schema)
   end
 
   defp parse_resp_to_command(_, _) do
@@ -480,6 +482,38 @@ defmodule MarcoPolo.Protocol do
       |> Enum.map(fn({_, rid_and_vsn}) -> rid_and_vsn end)
 
     %{created: created, updated: Enum.reverse(updated)}
+  end
+
+  defp parse_linked_records(existing_records, data, schema) do
+    case parse_only_linked_records(data, schema, []) do
+      {records, rest} ->
+        if Enum.member?(records, :unknown_property_id) do
+          {:unknown_property_id, rest}
+        else
+          {{existing_records, records}, rest}
+        end
+      :incomplete ->
+        :incomplete
+    end
+  end
+
+  defp parse_only_linked_records(<<0, rest :: binary>>, _schema, acc) do
+    {Enum.reverse(acc), rest}
+  end
+
+  defp parse_only_linked_records(<<2, rest :: binary>>, schema, acc) do
+    case parse_record_with_rid(rest, schema) do
+      {:unknown_property_id, rest} ->
+        parse_only_linked_records(rest, schema, [:unknown_property_id|acc])
+      {record, rest} ->
+        parse_only_linked_records(rest, schema, [record|acc])
+      :incomplete ->
+        :incomplete
+    end
+  end
+
+  defp parse_only_linked_records(_, _schema, _acc) do
+    :incomplete
   end
 
   defp req_code(:shutdown),                          do: 1

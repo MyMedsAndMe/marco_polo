@@ -23,7 +23,7 @@ defmodule MarcoPoloMiscTest do
   test "working with embedded lists in schemaful classes", %{conn: c} do
     class = "WorkingWithLists"
 
-    {:ok, cluster_id} = command(c, "CREATE CLASS #{class}")
+    {:ok, {cluster_id, _linked}} = command(c, "CREATE CLASS #{class}")
     {:ok, _} = command(c, "CREATE PROPERTY #{class}.list EMBEDDEDLIST")
 
     doc = %Document{class: class, fields: %{"l" => [1, "foo", 3.14]}}
@@ -36,12 +36,12 @@ defmodule MarcoPoloMiscTest do
 
   test "creating and then updating a record", %{conn: c} do
     cmd = "INSERT INTO Schemaless(name, f) VALUES ('create and update', 'foo')"
-    {:ok, %Document{} = doc} = command(c, cmd)
+    {:ok, {%Document{} = doc, _linked}} = command(c, cmd)
 
     assert doc.fields == %{"name" => "create and update", "f" => "foo"}
 
     cmd = "UPDATE Schemaless SET f = 'bar' WHERE name = 'create and update'"
-    {:ok, new_version} = command(c, cmd)
+    {:ok, {new_version, _linked}} = command(c, cmd)
 
     {:ok, [new_doc]} = load_record(c, doc.rid)
 
@@ -72,13 +72,13 @@ defmodule MarcoPoloMiscTest do
 
     assert :ok = create_record(c, cluster_id, doc, no_response: true)
 
-    {:ok, [loaded_doc]} = command(c, query, fetch_plan: "*:-1")
+    {:ok, {[loaded_doc], _linked}} = command(c, query, fetch_plan: "*:-1")
 
     assert loaded_doc.class == "Schemaless"
     assert loaded_doc.fields == fields
 
     assert :ok = delete_record(c, loaded_doc.rid, loaded_doc.version, no_response: true)
-    assert {:ok, []} = command(c, query, fetch_plan: "*:-1")
+    assert {:ok, {[], _linked}} = command(c, query, fetch_plan: "*:-1")
   end
 
   test "unknown property ids are handled automatically", %{conn: c} do
@@ -86,7 +86,7 @@ defmodule MarcoPoloMiscTest do
     {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
 
     insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
-    assert {:ok, %Document{} = record} = command(c, insert_query)
+    assert {:ok, {%Document{} = record, _linked}} = command(c, insert_query)
     assert record.class   == "UnknownPropertyId"
     assert record.version == 1
     assert record.fields  == %{"i" => 30}
@@ -96,10 +96,9 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, _} = command(c, "CREATE INDEX myIndex UNIQUE STRING")
     assert {:ok, _} = command(c, "INSERT INTO index:myIndex (key,rid) VALUES ('foo',#0:1)")
 
-    # TODO this fails with a fetch plan of *:-1 (fails with a timeout).
     query = "SELECT FROM index:myIndex WHERE key = 'foo'"
-    assert {:ok, [%Document{fields: %{"key" => "foo", "rid" => rid}}]}
-           = command(c, query, fetch_plan: "*:0")
+    assert {:ok, {[%Document{fields: %{"key" => "foo", "rid" => rid}}], _linked}}
+           = command(c, query, fetch_plan: "*:-1")
 
     assert rid == %RID{cluster_id: 0, position: 1}
   end
@@ -140,34 +139,37 @@ defmodule MarcoPoloMiscTest do
     {:ok, _} = command(c, "CREATE CLASS Restaurant EXTENDS V")
     {:ok, _} = command(c, "CREATE CLASS Eat EXTENDS E")
 
-    assert {:ok, %Document{} = jane} = command(c, "CREATE VERTEX Person SET name = 'Jane'")
-    assert {:ok, %Document{} = pizza_place} = command(c, "CREATE VERTEX Restaurant SET name = 'Pizza place'")
+    assert {:ok, {%Document{} = jane, _linked}}
+           = command(c, "CREATE VERTEX Person SET name = 'Jane'")
+    assert {:ok, {%Document{} = pizza_place, _linked}}
+           = command(c, "CREATE VERTEX Restaurant SET name = 'Pizza place'")
 
     # Let's assert we have the correct documents.
     assert jane.fields["name"] == "Jane"
     assert pizza_place.fields["name"] == "Pizza place"
 
-    assert {:ok, [edge]} = command(c, "CREATE EDGE Eat FROM ? to ?", params: [jane.rid, pizza_place.rid])
+    assert {:ok, {[edge], _linked}} = command(c, "CREATE EDGE Eat FROM ? to ?", params: [jane.rid, pizza_place.rid])
 
     assert edge.fields["in"] == pizza_place.rid
     assert edge.fields["out"] == jane.rid
 
-    assert {:ok, [doc]} = command(c, "SELECT IN() FROM Restaurant WHERE name = 'Pizza place'")
+    assert {:ok, {[doc], _linked}} = command(c, "SELECT IN() FROM Restaurant WHERE name = 'Pizza place'")
     assert doc.fields["IN"] == {:link_list, [jane.rid]}
 
-    assert {:ok, [doc]} = command(c, "SELECT OUT() FROM Person WHERE name = 'Jane'")
+    assert {:ok, {[doc], _linked}} = command(c, "SELECT OUT() FROM Person WHERE name = 'Jane'")
     assert doc.fields["OUT"] == {:link_list, [pizza_place.rid]}
   end
 
   test "nested queries", %{conn: c} do
-    assert {:ok, [%Document{} = doc]} = command(c, "SELECT * FROM (SELECT * FROM Schemaless) WHERE name = 'record_load'")
+    assert {:ok, {[%Document{} = doc], _linked}}
+           = command(c, "SELECT * FROM (SELECT * FROM Schemaless) WHERE name = 'record_load'")
     assert doc.fields["name"] == "record_load"
   end
 
   test "transactions", %{conn: c} do
-    {:ok, cluster_id} =
+    {:ok, {cluster_id, _linked}} =
       command(c, "CREATE CLASS TransactionsTest")
-    {:ok, [doc1, doc2, doc3]} =
+    {:ok, {[doc1, doc2, doc3], _linked}} =
       command(c, "INSERT INTO TransactionsTest(f) VALUES (1), (2), (3)")
 
     doc2 = %{doc2 | fields: Map.update!(doc2.fields, "f", &(&1 * 100))}
@@ -186,15 +188,15 @@ defmodule MarcoPoloMiscTest do
     assert [{%RID{cluster_id: ^cluster_id}, _}] = updated
 
     # Let's check the created records have actually been created.
-    assert {:ok, [_, _]}
+    assert {:ok, {[_, _], _linked}}
            = command(c, "SELECT FROM TransactionsTest WHERE f = 4 OR f = 5")
 
     # Let's check the record to update has been updated.
-    assert {:ok, [_updated_doc]}
+    assert {:ok, {[_updated_doc], _linked}}
            = command(c, "SELECT FROM TransactionsTest WHERE f = 200")
 
     # Let's check that doc3 has been deleted since OrientDB doesn't send an ack
     # for deletions in transactions.
-    assert {:ok, []} = command(c, "SELECT FROM TransactionsTest WHERE f = 3")
+    assert {:ok, {[], _linked}} = command(c, "SELECT FROM TransactionsTest WHERE f = 3")
   end
 end
