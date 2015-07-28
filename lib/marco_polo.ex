@@ -450,9 +450,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_update, args ++ [@request_modes.no_response])
     else
-      refetching_schema conn, fn ->
-        C.operation(conn, :record_update, args ++ [@request_modes.sync], opts)
-      end
+      C.operation(conn, :record_update, args ++ [@request_modes.sync], opts)
     end
   end
 
@@ -494,9 +492,7 @@ defmodule MarcoPolo do
     if opts[:no_response] do
       C.no_response_operation(conn, :record_delete, args ++ [@request_modes.no_response])
     else
-      refetching_schema conn, fn ->
-        C.operation(conn, :record_delete, args ++ [@request_modes.sync], opts)
-      end
+      C.operation(conn, :record_delete, args ++ [@request_modes.sync], opts)
     end
   end
 
