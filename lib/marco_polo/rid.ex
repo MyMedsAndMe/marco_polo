@@ -21,4 +21,10 @@ defmodule MarcoPolo.RID do
   }
 
   defstruct [:cluster_id, :position]
+
+  defimpl Inspect do
+    def inspect(%MarcoPolo.RID{cluster_id: cid, position: pos}, _opts) do
+      "#MarcoPolo.RID<##{cid}:#{pos}>"
+    end
+  end
 end
