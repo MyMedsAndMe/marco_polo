@@ -199,4 +199,38 @@ defmodule MarcoPoloMiscTest do
     # for deletions in transactions.
     assert {:ok, {[], _linked}} = command(c, "SELECT FROM TransactionsTest WHERE f = 3")
   end
+
+  @tag :scripting
+  test "batch transaction in a script with the SQL langauge (committing)", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS City")
+    {:ok, _} = command(c, "INSERT INTO City(name) VALUES ('London')")
+
+    script = """
+    BEGIN
+    LET person = CREATE VERTEX V SET first_name = 'Luke'
+    LET city = SELECT FROM City WHERE name = 'London'
+    LET edge = CREATE EDGE E FROM $person TO $city SET name = 'lives'
+    COMMIT RETRY 100
+    RETURN $edge
+    """
+
+    assert {:ok, {[edge], _}} = script(c, "SQL", script)
+    assert edge.class == "E"
+    assert edge.fields["name"] == "lives"
+  end
+
+  @tag :scripting
+  test "batch transaction in a script with the SQL language (rolling back)", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS Rollbacks")
+
+    script = """
+    BEGIN
+    LET person = INSERT INTO Rollbacks(name) VALUES ('Luke')
+    ROLLBACK
+    RETURN null
+    """
+
+    assert {:ok, {nil, []}} = script(c, "SQL", script)
+    assert command(c, "SELECT FROM Rollbacks") == {:ok, {[], []}}
+  end
 end
