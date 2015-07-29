@@ -200,6 +200,26 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, {[], _linked}} = command(c, "SELECT FROM TransactionsTest WHERE f = 3")
   end
 
+  test "unknown property ids after the first record", %{conn: c} do
+    {:ok, {cluster_id, _}} =
+      command(c, "CREATE CLASS UnknownPropertyIds")
+
+    {:ok, {rid1, _}} =
+      create_record(c, cluster_id, %Document{class: "UnknownPropertyIds", fields: %{"i" => 1}})
+
+    {:ok, _} =
+      command(c, "CREATE PROPERTY UnknownPropertyIds.str STRING")
+
+    {:ok, {rid2, _}} =
+      create_record(c,
+                    cluster_id,
+                    %Document{class: "UnknownPropertyIds", fields: %{"i" => 2, "str" => "value"}})
+
+    assert {:ok, {[doc1, doc2], _}} = command(c, "SELECT FROM UnknownPropertyIds ORDER BY i ASC")
+    assert doc1.rid == rid1
+    assert doc2.rid == rid2
+  end
+
   @tag :scripting
   test "batch transaction in a script with the SQL langauge (committing)", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS City")
