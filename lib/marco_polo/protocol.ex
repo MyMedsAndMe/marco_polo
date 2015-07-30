@@ -8,6 +8,7 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.GenericParser, as: GP
   alias MarcoPolo.Error
   alias MarcoPolo.Document
+  alias MarcoPolo.UndecodedDocument
   alias MarcoPolo.BinaryRecord
   alias MarcoPolo.RID
   alias MarcoPolo.Protocol.RecordSerialization
@@ -148,8 +149,6 @@ defmodule MarcoPolo.Protocol do
         case parse_resp_contents(op_name, rest, schema) do
           :incomplete ->
             :incomplete
-          {:unknown_property_id, rest} ->
-            {sid, {:error, :unknown_property_id}, rest}
           {resp, rest} ->
             {sid, {:ok, resp}, rest}
         end
@@ -290,14 +289,7 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:command, data, schema) do
-    case parse_resp_to_command(data, schema) do
-      {{:unknown_property_id, _}, rest} ->
-        {:unknown_property_id, rest}
-      :incomplete ->
-        :incomplete
-      o ->
-        o
-    end
+    parse_resp_to_command(data, schema)
   end
 
   defp parse_resp_contents(:tx_commit, data, _) do
@@ -332,13 +324,14 @@ defmodule MarcoPolo.Protocol do
     ]
 
     case GP.parse(rest, parsers) do
-      {[@document, version, record_content], rest} ->
-        case RecordSerialization.decode(record_content, schema) do
+      {[@document, version, content], rest} ->
+        case RecordSerialization.decode(content, schema) do
           :unknown_property_id ->
-            {:unknown_property_id, rest}
-          record ->
-            record = %{record | version: version}
+            record = %UndecodedDocument{version: version, content: content}
             parse_resp_to_record_load(rest, [record|acc], schema)
+          document ->
+            document = %{document | version: version}
+            parse_resp_to_record_load(rest, [document|acc], schema)
         end
       {[@binary_record, version, content], rest} ->
         record = %BinaryRecord{contents: content, version: version}
@@ -415,14 +408,16 @@ defmodule MarcoPolo.Protocol do
 
     case GP.parse(rest, parsers) do
       {[?d, cluster_id, cluster_pos, version, record_content], rest} ->
-        case RecordSerialization.decode(record_content, schema) do
+        rid = %RID{cluster_id: cluster_id, position: cluster_pos}
+
+        record = case RecordSerialization.decode(record_content, schema) do
           :unknown_property_id ->
-            {:unknown_property_id, rest}
+            %UndecodedDocument{version: version, rid: rid, content: record_content}
           record ->
-            rid    = %RID{cluster_id: cluster_id, position: cluster_pos}
-            record = %{record | version: version, rid: rid}
-            {record, rest}
+            %{record | version: version, rid: rid}
         end
+
+        {record, rest}
       :incomplete ->
         :incomplete
     end
@@ -487,11 +482,7 @@ defmodule MarcoPolo.Protocol do
   defp parse_linked_records(existing_records, data, schema) do
     case parse_only_linked_records(data, schema, []) do
       {records, rest} ->
-        if Enum.member?(records, :unknown_property_id) do
-          {:unknown_property_id, rest}
-        else
-          {{existing_records, records}, rest}
-        end
+        {{existing_records, records}, rest}
       :incomplete ->
         :incomplete
     end
@@ -503,8 +494,6 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_only_linked_records(<<2, rest :: binary>>, schema, acc) do
     case parse_record_with_rid(rest, schema) do
-      {:unknown_property_id, rest} ->
-        parse_only_linked_records(rest, schema, [:unknown_property_id|acc])
       {record, rest} ->
         parse_only_linked_records(rest, schema, [record|acc])
       :incomplete ->

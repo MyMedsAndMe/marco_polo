@@ -77,7 +77,7 @@ defmodule MarcoPolo.Connection do
   """
   @spec fetch_schema(pid) :: :ok
   def fetch_schema(pid) do
-    Connection.cast(pid, :fetch_schema)
+    Connection.call(pid, :fetch_schema)
   end
 
   defp maybe_fetch_schema(pid, opts) do
@@ -165,23 +165,23 @@ defmodule MarcoPolo.Connection do
     |> send_noreply(req)
   end
 
-  @doc false
-  def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
-    check_op_is_allowed!(s, op_name)
-
-    req = Protocol.encode_op(op_name, [sid|args])
-    send_noreply(s, req)
-  end
-
-  def handle_cast(:fetch_schema, %{session_id: sid} = s) do
+  def handle_call(:fetch_schema, from, %{session_id: sid} = s) do
     check_op_is_allowed!(s, :record_load)
 
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
     req = Protocol.encode_op(:record_load, args)
 
     s
-    |> enqueue(:fetch_schema)
+    |> enqueue({:fetch_schema, from})
     |> send_noreply(req)
+  end
+
+  @doc false
+  def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
+    check_op_is_allowed!(s, op_name)
+
+    req = Protocol.encode_op(op_name, [sid|args])
+    send_noreply(s, req)
   end
 
   def handle_cast(:stop, s) do
@@ -237,7 +237,7 @@ defmodule MarcoPolo.Connection do
     update_in s.queue, &:queue.in(what, &1)
   end
 
-  defp dequeue_and_parse_resp(s, {{:value, :fetch_schema}, new_queue}, data) do
+  defp dequeue_and_parse_resp(s, {{:value, {:fetch_schema, from}}, new_queue}, data) do
     sid = s.session_id
 
     case Protocol.parse_resp(:record_load, data, s.schema) do
@@ -246,7 +246,9 @@ defmodule MarcoPolo.Connection do
       {^sid, {:error, _}, _rest} ->
         raise "couldn't fetch schema"
       {^sid, {:ok, [schema]}, rest} ->
-        %{s | schema: parse_schema(schema), tail: rest, queue: new_queue}
+        schema = parse_schema(schema)
+        Connection.reply(from, schema)
+        %{s | schema: schema, tail: rest, queue: new_queue}
     end
   end
 

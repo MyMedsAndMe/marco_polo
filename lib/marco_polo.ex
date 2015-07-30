@@ -34,8 +34,10 @@ defmodule MarcoPolo do
   alias MarcoPolo.Connection, as: C
   alias MarcoPolo.RID
   alias MarcoPolo.Document
+  alias MarcoPolo.UndecodedDocument
   alias MarcoPolo.BinaryRecord
   alias MarcoPolo.Protocol
+  alias MarcoPolo.Protocol.RecordSerialization
 
   @default_opts [
     host: "localhost",
@@ -711,12 +713,43 @@ defmodule MarcoPolo do
 
   defp refetching_schema(conn, fun) do
     case fun.() do
-      {:error, :unknown_property_id} ->
-        C.fetch_schema(conn)
-        fun.()
+      {:ok, records} when is_list(records) ->
+        if unknown_property_ids?(records) do
+          schema = C.fetch_schema(conn)
+          {:ok, redecode_with_new_schema(records, schema)}
+        else
+          {:ok, records}
+        end
+      {:ok, {records, linked}} when is_list(linked) ->
+        if unknown_property_ids?(records) or unknown_property_ids?(linked) do
+          schema = C.fetch_schema(conn)
+          {:ok, {redecode_with_new_schema(records, schema), redecode_with_new_schema(linked, schema)}}
+        else
+          {:ok, {records, linked}}
+        end
       o ->
         o
     end
+  end
+
+  defp unknown_property_ids?(%UndecodedDocument{}),
+    do: true
+  defp unknown_property_ids?(records) when is_list(records),
+    do: Enum.any?(records, &match?(%UndecodedDocument{}, &1))
+  defp unknown_property_ids?(_),
+    do: false
+
+  defp redecode_with_new_schema(records, schema) when is_list(records) do
+    Enum.map records, &redecode_with_new_schema(&1, schema)
+  end
+
+  defp redecode_with_new_schema(%UndecodedDocument{rid: rid, version: vsn, content: content}, schema) do
+    doc = RecordSerialization.decode(content, schema)
+    %{doc | version: vsn, rid: rid}
+  end
+
+  defp redecode_with_new_schema(record, _schema) do
+    record
   end
 
   defp to_params(params) when is_map(params) do
