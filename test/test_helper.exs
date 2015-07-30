@@ -5,6 +5,23 @@ ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ [:scripting]
 ExUnit.start()
 
 unless :integration in ExUnit.configuration[:exclude] do
+  unless System.get_env("ORIENTDB_USER") do
+    IO.puts IO.ANSI.format([:red, """
+    The $ORIENTDB_USER variable is empty, but it needs to be set to an
+    OrientDB admin username in order to run MarcoPolo tests.
+    """])
+    System.halt(1)
+  end
+
+  unless System.get_env("ORIENTDB_PASS") do
+    IO.puts IO.ANSI.format([:red, """
+    The $ORIENTDB_PASS variable is empty, but it needs to be set to the
+    password for the user specified in the $ORIENTDB_USER variable in order to
+    run MarcoPolo tests.
+    """])
+    System.halt(1)
+  end
+
   case :gen_tcp.connect('localhost', 2424, []) do
     {:ok, _} ->
       :ok
