@@ -3,7 +3,7 @@ defmodule MarcoPolo.FetchPlanTest do
 
   doctest MarcoPolo.FetchPlan
 
-  import MarcoPolo.FetchPlan, only: [follow_link: 2, follow_link!: 2]
+  import MarcoPolo.FetchPlan, only: [resolve_links: 2, resolve_links!: 2]
   alias MarcoPolo.RID
   alias MarcoPolo.Document, as: Doc
 
@@ -16,15 +16,15 @@ defmodule MarcoPolo.FetchPlanTest do
       rid_and_doc(rid(0, 0), "Bar"),
     ])
 
-    assert follow_link(@target_rid, linked) == {:ok, doc}
+    assert resolve_links(@target_rid, linked) == {:ok, doc}
   end
 
-  test "follow_link/2: single link which cannot be followed" do
+  test "resolve_links/2: single link which cannot be followed" do
     linked = make_linked([rid_and_doc(rid(-1, -1), "Bar")])
-    assert follow_link(@target_rid, linked) == :error
+    assert resolve_links(@target_rid, linked) == :error
   end
 
-  test "follow_link/2: lists of links with all the right links" do
+  test "resolve_links/2: lists of links with all the right links" do
     rids = [rid(0, 0), rid(0, 1)]
     linked = make_linked([
       rid_and_doc(rid(0, 1), "Foo"),
@@ -33,16 +33,16 @@ defmodule MarcoPolo.FetchPlanTest do
     ])
 
     assert {:ok, [%Doc{class: "Baz"}, %Doc{class: "Foo"}]}
-           = follow_link(rids, linked)
+           = resolve_links(rids, linked)
   end
 
-  test "follow_link/2: list of links with missing links" do
+  test "resolve_links/2: list of links with missing links" do
     rids = [rid(0, 0)]
     linked = make_linked([rid_and_doc(rid(99, 99), "Foo")])
-    assert follow_link(rids, linked) == :error
+    assert resolve_links(rids, linked) == :error
   end
 
-  test "follow_link/2: maps of links with all the right links" do
+  test "resolve_links/2: maps of links with all the right links" do
     rids = %{"foo" => rid(0, 0), "bar" => rid(0, 1)}
     linked = make_linked([
       rid_and_doc(rid(0, 0), "Foo"),
@@ -51,19 +51,19 @@ defmodule MarcoPolo.FetchPlanTest do
     ])
 
     assert {:ok, %{"foo" => %Doc{class: "Foo"}, "bar" => %Doc{class: "Bar"}}}
-           = follow_link(rids, linked)
+           = resolve_links(rids, linked)
   end
 
-  test "follow_link/2: maps of links with missing links" do
+  test "resolve_links/2: maps of links with missing links" do
     rids = %{"foo" => rid(0, 0)}
     linked = make_linked([
       rid_and_doc(rid(0, 100), "Wat"),
     ])
 
-    assert follow_link(rids, linked) == :error
+    assert resolve_links(rids, linked) == :error
   end
 
-  test "follow_link!/2: behaves like follow link but returns a RecordNotFound error" do
+  test "resolve_links!/2: behaves like follow link but returns a RecordNotFound error" do
     rids = %{"foo" => rid(0, 0), "bar" => rid(0, 1)}
     linked = make_linked([
       rid_and_doc(rid(0, 0), "Foo"),
@@ -72,10 +72,10 @@ defmodule MarcoPolo.FetchPlanTest do
     ])
 
     assert %{"foo" => %Doc{class: "Foo"}, "bar" => %Doc{class: "Bar"}}
-           = follow_link!(rids, linked)
+           = resolve_links!(rids, linked)
 
     error = assert_raise MarcoPolo.FetchPlan.RecordNotFoundError, fn ->
-      follow_link!(rid(99, 99), linked)
+      resolve_links!(rid(99, 99), linked)
     end
 
     assert error.message =~ "the linked records don't include one of these RIDs"

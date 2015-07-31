@@ -251,9 +251,9 @@ defmodule MarcoPoloMiscTest do
       command(c, "SELECT FROM FetchingPlans WHERE name = 'child'", fetch_plan: "mother:0")
 
     assert resp.response == [child]
-    assert MarcoPolo.FetchPlan.follow_link(child.fields["mother"], resp.linked_records)
+    assert MarcoPolo.FetchPlan.resolve_links(child.fields["mother"], resp.linked_records)
            == {:ok, mother}
-    assert MarcoPolo.FetchPlan.follow_link(child.fields["father"], resp.linked_records)
+    assert MarcoPolo.FetchPlan.resolve_links(child.fields["father"], resp.linked_records)
            == :error
   end
 

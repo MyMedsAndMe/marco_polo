@@ -38,7 +38,7 @@ defmodule MarcoPolo.FetchPlan do
       iex> rid = %MarcoPolo.RID{cluster_id: 1, position: 10}
       iex> linked = HashDict.new
       ...>          |> Dict.put(rid, %MarcoPolo.Document{rid: rid, fields: %{"foo" => "bar"}})
-      iex> {:ok, doc} = MarcoPolo.FetchPlan.follow_link(rid, linked)
+      iex> {:ok, doc} = MarcoPolo.FetchPlan.resolve_links(rid, linked)
       iex> doc.fields
       %{"foo" => "bar"}
       iex> doc.rid == rid
@@ -46,26 +46,26 @@ defmodule MarcoPolo.FetchPlan do
 
       iex> rids = [%MarcoPolo.RID{cluster_id: 1, position: 10},
       ...>         %MarcoPolo.RID{cluster_id: 1, position: 11}]
-      iex> MarcoPolo.FetchPlan.follow_link(rids, %{})
+      iex> MarcoPolo.FetchPlan.resolve_links(rids, %{})
       :error
 
   """
-  @spec follow_link(RID.t, [MarcoPolo.rec])
+  @spec resolve_links(RID.t, [MarcoPolo.rec])
     :: {:ok, MarcoPolo.rec} | :error
-  @spec follow_link([RID.t], [MarcoPolo.rec])
+  @spec resolve_links([RID.t], [MarcoPolo.rec])
     :: {:ok, [MarcoPolo.rec]} | :error
-  @spec follow_link(%{term => RID.t}, [MarcoPolo.rec])
+  @spec resolve_links(%{term => RID.t}, [MarcoPolo.rec])
     :: {:ok, %{term => MarcoPolo.rec}} | :error
-  def follow_link(rids, linked)
+  def resolve_links(rids, linked)
 
-  def follow_link(%RID{} = rid, linked) do
+  def resolve_links(%RID{} = rid, linked) do
     Dict.fetch(linked, rid)
   end
 
-  def follow_link(rids, linked) when is_list(rids) do
+  def resolve_links(rids, linked) when is_list(rids) do
     catch_missing fn ->
       followed = Enum.map rids, fn(%RID{} = rid) ->
-        case follow_link(rid, linked) do
+        case resolve_links(rid, linked) do
           {:ok, record} -> record
           :error     -> throw(:missing_link)
         end
@@ -75,10 +75,10 @@ defmodule MarcoPolo.FetchPlan do
     end
   end
 
-  def follow_link(rids, linked) when is_map(rids) do
+  def resolve_links(rids, linked) when is_map(rids) do
     catch_missing fn ->
       map = for {key, rid} <- rids, into: %{} do
-        case follow_link(rid, linked) do
+        case resolve_links(rid, linked) do
           {:ok, record} -> {key, record}
           :error     -> throw(:missing_link)
         end
@@ -92,7 +92,7 @@ defmodule MarcoPolo.FetchPlan do
   Transforms RIDs to OrientDB records based on a set of linked records, raising
   an exception for not found records.
 
-  This function behaves exactly like `follow_link/2`, except it returns the
+  This function behaves exactly like `resolve_links/2`, except it returns the
   result directly (not as `{:ok, res}` but just as `res`) or raises a
   `MarcoPolo.FetchPlan.RecordNotFoundError` in case one of the RIDs is not
   found.
@@ -102,15 +102,15 @@ defmodule MarcoPolo.FetchPlan do
       iex> rid = %MarcoPolo.RID{cluster_id: 1, position: 10}
       iex> linked = HashDict.new
       ...>          |> Dict.put(rid, %MarcoPolo.Document{rid: rid, fields: %{"foo" => "bar"}})
-      iex> MarcoPolo.FetchPlan.follow_link!(rid, linked).fields
+      iex> MarcoPolo.FetchPlan.resolve_links!(rid, linked).fields
       %{"foo" => "bar"}
 
   """
-  @spec follow_link!(RID.t, [MarcoPolo.rec]) :: MarcoPolo.rec
-  @spec follow_link!([RID.t], [MarcoPolo.rec]) :: [MarcoPolo.rec]
-  @spec follow_link!(%{term => RID.t}, [MarcoPolo.rec]) :: %{term => MarcoPolo.rec}
-  def follow_link!(rids, linked) do
-    case follow_link(rids, linked) do
+  @spec resolve_links!(RID.t, [MarcoPolo.rec]) :: MarcoPolo.rec
+  @spec resolve_links!([RID.t], [MarcoPolo.rec]) :: [MarcoPolo.rec]
+  @spec resolve_links!(%{term => RID.t}, [MarcoPolo.rec]) :: %{term => MarcoPolo.rec}
+  def resolve_links!(rids, linked) do
+    case resolve_links(rids, linked) do
       {:ok, res} ->
         res
       :error ->
