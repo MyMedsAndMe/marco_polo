@@ -224,6 +224,25 @@ defmodule MarcoPoloMiscTest do
     assert doc2.rid == rid2
   end
 
+  test "fetch plans", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS FetchingPlans")
+    {:ok, %{response: mother}} =
+      command(c, "INSERT INTO FetchingPlans(name) VALUES ('mother')")
+    {:ok, %{response: father}} =
+      command(c, "INSERT INTO FetchingPlans(name) VALUES ('father')")
+
+    params = ["child", father.rid, mother.rid]
+    {:ok, %{response: child}} = command(c, "INSERT INTO FetchingPlans(name, father, mother) VALUES (?, ?, ?)", params: params)
+
+    assert {:ok, resp} = command(c, "SELECT FROM FetchingPlans WHERE name = 'child'", fetch_plan: "mother:0")
+
+    assert resp.response == [child]
+    assert MarcoPolo.FetchPlan.follow_link(child.fields["mother"], resp.linked_records)
+           == {:ok, mother}
+    assert MarcoPolo.FetchPlan.follow_link(child.fields["father"], resp.linked_records)
+           == :error
+  end
+
   @tag :scripting
   test "batch transaction in a script with the SQL langauge (committing)", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS City")
