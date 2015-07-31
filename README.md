@@ -21,14 +21,18 @@ Now run `mix deps.get` in your shell to fetch and compile MarcoPolo. To play wit
                                    password: "admin",
                                    connection: {:db, "GratefulDeadConcerts", :document})
 
-MarcoPolo.command(conn, "CREATE CLASS ProgrammingLanguage")
-#=> {:ok, 15}
+{:ok, %{response: cluster_id}} = MarcoPolo.command(conn, "CREATE CLASS ProgrammingLanguage")
+cluster_id #=> 15
 
-MarcoPolo.command(conn, "INSERT INTO ProgrammingLanguage(name) VALUES ('Elixir')")
-#=> {:ok, {%MarcoPolo.RID{cluster_id: 15, position: 0}, 1}}
+query = "INSERT INTO ProgrammingLanguage(name) VALUES (?)"
+{:ok, %{response: doc}} = MarcoPolo.command(conn, query, params: ["Elixir"])
+doc.rid     #=> #MarcoPolo.RID<#15:0>
+doc.version #=> 1
+doc.fields  #=> %{"name" => "Elixir"}
 
-MarcoPolo.command(conn, "SELECT FROM ProgrammingLanguage WHERE name = 'Elixir'")
-#=> {:ok, [%MarcoPolo.Document{class: "ProgrammingLanguage", version: 1, fields: %{"name" => "Elixir"}}]}
+query = "SELECT FROM ProgrammingLanguage WHERE name = :name"
+{:ok, %{response: [language]}} = MarcoPolo.command(conn, query, params: %{name: "Elixir"})
+language == doc #=> true
 ```
 
 ## Types
@@ -80,7 +84,8 @@ Caveats:
 
 ### RidBags
 
-As of version 0.1, MarcoPolo doesn't support tree RidBags. It only supports embedded RidBags.
+As of version 0.1, MarcoPolo doesn't support tree RidBags. It only supports
+embedded RidBags.
 
 Embedded RidBags are represented in Elixir like this:
 
@@ -103,6 +108,49 @@ to that number of links. For example:
 </properties>
 ```
 
+## Working with graphs
+
+MarcoPolo supports working with graphs using the same `MarcoPolo.command/3`
+function showed above:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :graph})
+
+query = "CREATE VERTEX V SET name = 'Pizza place'"
+{:ok, %{response: pizza_place}} = MarcoPolo.command(conn, query)
+query = "CREATE VERTEX V SET name = 'Jane'"
+{:ok, %{response: jane}} = MarcoPolo.command(conn, query)
+
+query = "CREATE EDGE HasEatenIn FROM ? to ?"
+params = [jane.rid, pizza_place.rid]
+{:ok, %{response: edge}} = MarcoPolo.command(conn, query, params: params)
+
+edge.fields["in"]  #=> {:link_list, [pizza_place.rid]}
+edge.fields["out"] #=> {:link_list, [jane.rid]}
+```
+
+## Scripting
+
+OrientDB supports server-side scripting (for example,
+[JavaScript][odb-javascript] and [SQL-batch][odb-sql-batch]). MarcoPolo supports
+this feature through the `MarcoPolo.script/4` function:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :document})
+
+{:ok, _} = MarcoPolo.script(conn, "Javascript", """
+db.command('CREATE CLASS Number);
+
+for (var i = 1; i <= 10; i++) {
+  db.command('INSERT INTO Number(value) VALUES (' + i + ')');
+}
+""")
+```
+
 ## Contributing
 
 For more information on how to contribute to MarcoPolo (including how to clone
@@ -111,3 +159,5 @@ the repository and run tests), have a look at the
 
 [docs]: http://hexdocs.pm/marco_polo
 [decimal]: https://github.com/ericmj/decimal
+[odb-javascript]: http://orientdb.com/docs/last/Javascript-Command.html
+[odb-sql-batch]: http://orientdb.com/docs/last/SQL-batch.html
