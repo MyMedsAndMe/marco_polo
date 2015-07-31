@@ -207,7 +207,7 @@ defmodule MarcoPoloMiscTest do
     {:ok, %{response: cluster_id}} =
       command(c, "CREATE CLASS UnknownPropertyIds")
 
-    {:ok, %{response: rid1}} =
+    {:ok, {rid1, _}} =
       create_record(c, cluster_id, %Document{class: "UnknownPropertyIds", fields: %{"i" => 1}})
 
     {:ok, _} =

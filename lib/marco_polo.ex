@@ -713,19 +713,14 @@ defmodule MarcoPolo do
 
   defp refetching_schema(conn, fun) do
     case fun.() do
-      {:ok, records} when is_list(records) ->
-        if unknown_property_ids?(records) do
+      {:ok, %{response: response, linked_records: linked} = r} ->
+        if unknown_property_ids?(response) or unknown_property_ids?(linked) do
           schema = C.fetch_schema(conn)
-          {:ok, redecode_with_new_schema(records, schema)}
+          response = redecode_with_new_schema(response, schema)
+          linked = redecode_with_new_schema(linked, schema)
+          {:ok, %{r | response: response, linked_records: linked}}
         else
-          {:ok, records}
-        end
-      {:ok, {records, linked}} when is_list(linked) ->
-        if unknown_property_ids?(records) or unknown_property_ids?(linked) do
-          schema = C.fetch_schema(conn)
-          {:ok, {redecode_with_new_schema(records, schema), redecode_with_new_schema(linked, schema)}}
-        else
-          {:ok, {records, linked}}
+          {:ok, r}
         end
       o ->
         o
@@ -735,17 +730,25 @@ defmodule MarcoPolo do
   defp unknown_property_ids?(%UndecodedDocument{}),
     do: true
   defp unknown_property_ids?(records) when is_list(records),
-    do: Enum.any?(records, &match?(%UndecodedDocument{}, &1))
+    do: Enum.any?(records, &unknown_property_ids?/1)
+  defp unknown_property_ids?(%HashDict{} = records),
+    do: Enum.any?(records, &unknown_property_ids?/1)
   defp unknown_property_ids?(_),
     do: false
 
   defp redecode_with_new_schema(records, schema) when is_list(records) do
-    Enum.map records, &redecode_with_new_schema(&1, schema)
+    Enum.map(records, &redecode_with_new_schema(&1, schema))
   end
 
   defp redecode_with_new_schema(%UndecodedDocument{rid: rid, version: vsn, content: content}, schema) do
     doc = RecordSerialization.decode(content, schema)
     %{doc | version: vsn, rid: rid}
+  end
+
+  defp redecode_with_new_schema(%HashDict{} = records, schema) do
+    for {rid, record} <- records, into: HashDict.new do
+      {rid, redecode_with_new_schema(record, schema)}
+    end
   end
 
   defp redecode_with_new_schema(record, _schema) do
