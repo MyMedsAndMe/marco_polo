@@ -245,7 +245,7 @@ defmodule MarcoPolo.Connection do
         %{s | tail: data}
       {^sid, {:error, _}, _rest} ->
         raise "couldn't fetch schema"
-      {^sid, {:ok, [schema]}, rest} ->
+      {^sid, {:ok, {schema, _linked_records}}, rest} ->
         schema = parse_schema(schema)
         Connection.reply(from, schema)
         %{s | schema: schema, tail: rest, queue: new_queue}

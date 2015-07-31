@@ -110,7 +110,7 @@ defmodule MarcoPoloTest do
     test "load_record/4: loading a document", %{conn: c} do
       rid = TestHelpers.record_rid("record_load")
 
-      {:ok, [record]} = MarcoPolo.load_record(c, rid, fetch_plan: "*:-1")
+      {:ok, {record, _}} = MarcoPolo.load_record(c, rid, fetch_plan: "*:-1")
 
       assert %Document{} = record
       assert record.version == 1
@@ -119,7 +119,7 @@ defmodule MarcoPoloTest do
 
       rid = TestHelpers.record_rid("schemaless_record_load")
 
-      {:ok, [record]} = MarcoPolo.load_record(c, rid)
+      {:ok, {record, _}} = MarcoPolo.load_record(c, rid)
       assert record.version == 1
       assert record.class == "Schemaful"
       assert record.fields == %{"myString" => "record_load"}
@@ -127,13 +127,12 @@ defmodule MarcoPoloTest do
 
     test "load_record/4 using the :if_version_not_latest option", %{conn: c} do
       rid = TestHelpers.record_rid("record_load")
-
-      assert {:ok, []} = MarcoPolo.load_record(c, rid, version: 1, if_version_not_latest: true)
+      assert {:ok, {nil, _}} = MarcoPolo.load_record(c, rid, version: 1, if_version_not_latest: true)
     end
 
     test "delete_record/3", %{conn: c} do
-      version  = 1
-      rid      = TestHelpers.record_rid("record_delete")
+      version = 1
+      rid = TestHelpers.record_rid("record_delete")
 
       # Wrong version causes no deletions.
       assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 100)

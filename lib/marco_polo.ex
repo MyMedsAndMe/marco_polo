@@ -61,6 +61,7 @@ defmodule MarcoPolo do
   @type storage_type :: :plocal | :memory
 
   @type rec :: Document.t | BinaryRecord.t
+  @type linked_records :: HashDict.t
 
   @type tx_operation :: {:create | :update | :delete, rec}
 
@@ -344,8 +345,7 @@ defmodule MarcoPolo do
   @doc """
   Loads a record from the database to which `conn` is connected.
 
-  The record to load is identified by `rid`. Since multiple records could be returned,
-  the return value is `{:ok, list_of_records}`.
+  The record to load is identified by `rid`.
 
   ## Options
 
@@ -366,6 +366,16 @@ defmodule MarcoPolo do
     * `:timeout` - operation timeout in milliseconds. If this timeout expires,
       an exit signal will be sent to the calling process.
 
+  ## Return value
+
+  This function returns `{:ok, resp}` in case of a successful request or
+  `{:error, reason}` otherwise. In case of success, `resp` will be a two-element
+  tuple with the loaded record as the first elemen, and with a set of records
+  linked to it as the second element. This set of linked records can be
+  controlled via the `:fetch_plan` options. You're not supposed to manipulate
+  this value directly (so that the implementation can stay flexible); use the
+  functions in the `MarcoPolo.FetchPlan` module to work with linked records.
+
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
   docs for the `MarcoPolo` module.
@@ -373,12 +383,12 @@ defmodule MarcoPolo do
   ## Examples
 
       iex> rid = %MarcoPolo.RID{cluster_id: 10, position: 184}
-      iex> {:ok, [record]} = MarcoPolo.load_record(conn, rid)
+      iex> {:ok, {record, linked_records}} = MarcoPolo.load_record(conn, rid)
       iex> record.fields
       %{"foo" => "bar"}
 
   """
-  @spec load_record(pid, RID.t, Keyword.t) :: {:ok, [Document.t]} | {:error, term}
+  @spec load_record(pid, RID.t, Keyword.t) :: {:ok, {rec, linked_records}} | {:error, term}
   def load_record(conn, %RID{} = rid, opts \\ []) do
     {op, args} =
       if opts[:if_version_not_latest] do
@@ -415,7 +425,8 @@ defmodule MarcoPolo do
       related collections (e.g. RidBags) have to be updated, but the record
       version and its contents should not be updated.
 
-  When the update is successful, `{:ok, new_version}` is returned.
+  When the update is successful, `{:ok, new_version}` is returned; otherwise,
+  `{:error, reason}`.
 
   ## Options
 
@@ -528,12 +539,18 @@ defmodule MarcoPolo do
 
   ## Return value
 
-  If the query is successful then the return value is an `{:ok, values}` tuple
-  where `values` strictly depends on the performed query. Usually, `values` is a
-  list of results. For example, when a `CREATE CLUSTER` command is executed,
-  `{:ok, [cluster_id]}` is returned where `cluster_id` is the id of the newly
-  created cluster.
-  query.
+  If the query is successful then the return value is an `{:ok, values}`
+  tuple. `values` is a map with the following keys:
+
+    * `:response` - depends on the performed query. For example a `SELECT` query
+      will return a list of records, while a `CREATE CLUSTER` command will
+      return a cluster id.
+    * `:linked_records` - it's a set of additional records that have been
+      fetched by OrientDB. This can be controlled using a [fetch
+      plan](https://orientdb.com/docs/last/Fetching-Strategies.html) in the
+      query. You're not supposed to manipulate this value directly (so that the
+      implementation can stay flexible); use the functions in the
+      `MarcoPolo.FetchPlan` module to work with linked records.
 
   This operation can only be performed on connections to a database. To learn
   more about the connection type, look at the "Connection type" section in the
@@ -561,7 +578,8 @@ defmodule MarcoPolo do
       "abed"
 
   """
-  @spec command(pid, String.t, Keyword.t) :: {:ok, term} | {:error, term}
+  @spec command(pid, String.t, Keyword.t)
+    :: {:ok, %{response: term, linked_records: linked_records}} | {:error, term}
   def command(conn, query, opts \\ []) do
     query_type = query_type(query)
 

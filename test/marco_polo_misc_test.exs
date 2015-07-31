@@ -30,7 +30,7 @@ defmodule MarcoPoloMiscTest do
 
     assert {:ok, {%RID{} = rid, _version}} = create_record(c, cluster_id, doc)
 
-    assert {:ok, [loaded_doc]} = load_record(c, rid)
+    assert {:ok, {loaded_doc, _}} = load_record(c, rid)
     assert loaded_doc.fields == doc.fields
   end
 
@@ -43,7 +43,7 @@ defmodule MarcoPoloMiscTest do
     cmd = "UPDATE Schemaless SET f = 'bar' WHERE name = 'create and update'"
     {:ok, %{response: new_version}} = command(c, cmd)
 
-    {:ok, [new_doc]} = load_record(c, doc.rid)
+    {:ok, {new_doc, _}} = load_record(c, doc.rid)
 
     assert new_doc.fields["f"] == "bar"
     assert is_integer(new_version)
@@ -57,7 +57,7 @@ defmodule MarcoPoloMiscTest do
     }}
 
     {:ok, {rid, _vsn}}  = create_record(c, cluster_id, doc)
-    {:ok, [loaded_doc]} = load_record(c, rid)
+    {:ok, {loaded_doc, _}} = load_record(c, rid)
 
     assert %{"nested" => nested} = loaded_doc.fields
     assert %{"doc" => %Document{} = nested_doc} = nested
@@ -120,7 +120,7 @@ defmodule MarcoPoloMiscTest do
     blob = %BinaryRecord{contents: <<91, 23>>}
 
     assert {:ok, {%RID{} = rid, _}} = create_record(c, cluster_id, blob)
-    assert {:ok, [%BinaryRecord{} = record]} = load_record(c, rid)
+    assert {:ok, {%BinaryRecord{} = record, _}} = load_record(c, rid)
     assert record.contents == <<91, 23>>
   end
 

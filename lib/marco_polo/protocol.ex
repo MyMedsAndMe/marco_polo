@@ -342,7 +342,12 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_record_load(<<0, rest :: binary>>, acc, _) do
-    {Enum.reverse(acc), rest}
+    case Enum.reverse(acc) do
+      [record|linked_records] ->
+        {{record, build_linked_records(linked_records)}, rest}
+      [] ->
+        {{nil, build_linked_records([])}, rest}
+    end
   end
 
   defp parse_resp_to_record_load(_, _acc, _) do
