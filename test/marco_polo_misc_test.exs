@@ -244,9 +244,11 @@ defmodule MarcoPoloMiscTest do
       command(c, "INSERT INTO FetchingPlans(name) VALUES ('father')")
 
     params = ["child", father.rid, mother.rid]
-    {:ok, %{response: child}} = command(c, "INSERT INTO FetchingPlans(name, father, mother) VALUES (?, ?, ?)", params: params)
+    {:ok, %{response: child}} =
+      command(c, "INSERT INTO FetchingPlans(name, father, mother) VALUES (?, ?, ?)", params: params)
 
-    assert {:ok, resp} = command(c, "SELECT FROM FetchingPlans WHERE name = 'child'", fetch_plan: "mother:0")
+    assert {:ok, resp} =
+      command(c, "SELECT FROM FetchingPlans WHERE name = 'child'", fetch_plan: "mother:0")
 
     assert resp.response == [child]
     assert MarcoPolo.FetchPlan.follow_link(child.fields["mother"], resp.linked_records)
