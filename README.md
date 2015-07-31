@@ -1,4 +1,4 @@
-# MarcoPolo
+# MarcoPolo [![Build Status](https://travis-ci.org/MyMedsAndMe/marco_polo.svg?branch=master)](https://travis-ci.org/MyMedsAndMe/marco_polo)
 
 Marco Polo is a binary OrientDB driver for Elixir.
 
