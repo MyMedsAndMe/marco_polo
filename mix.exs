@@ -23,7 +23,7 @@ defmodule MarcoPolo.Mixfile do
 
   defp deps do
     [{:decimal, "~> 1.1.0"},
-     {:connection, github: "fishcakez/connection"},
+     {:connection, "1.0.0-rc.1"},
      {:small_ints, github: "whatyouhide/small_ints"},
      {:dialyze, "~> 0.2.0", only: :dev},
      {:coverex, "~> 1.4", only: :test},
