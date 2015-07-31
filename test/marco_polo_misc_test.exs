@@ -81,16 +81,28 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, %{response: []}} = command(c, query, fetch_plan: "*:-1")
   end
 
-  test "unknown property ids are handled automatically", %{conn: c} do
-    {:ok, _} = command(c, "CREATE CLASS UnknownPropertyId")
-    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyId.i SHORT")
+  test "unknown property ids are handled automatically with command/3", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS UnknownPropertyIdCommand")
+    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyIdCommand.i SHORT")
 
-    insert_query = "INSERT INTO UnknownPropertyId(i) VALUES (30)"
+    insert_query = "INSERT INTO UnknownPropertyIdCommand(i) VALUES (30)"
     assert {:ok, %{response: record}} = command(c, insert_query)
     assert %Document{} = record
-    assert record.class   == "UnknownPropertyId"
+    assert record.class   == "UnknownPropertyIdCommand"
     assert record.version == 1
     assert record.fields  == %{"i" => 30}
+  end
+
+  test "unknown property ids are handled automatically with load_record/3", %{conn: c} do
+    {:ok, %{response: cluster_id}} = command(c, "CREATE CLASS UnknownPropertyIdRecordLoad")
+    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyIdRecordLoad.i SHORT")
+
+    doc = %Document{class: "UnknownPropertyIdRecordLoad", fields: %{"i" => 1}}
+    {:ok, {rid, _}} = create_record(c, cluster_id, doc)
+
+    assert {:ok, {loaded_doc, _}} = load_record(c, rid)
+    assert loaded_doc.class == "UnknownPropertyIdRecordLoad"
+    assert loaded_doc.fields == %{"i" => 1}
   end
 
   test "index management", %{conn: c} do
