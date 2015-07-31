@@ -482,7 +482,11 @@ defmodule MarcoPolo.Protocol do
   defp parse_linked_records(existing_records, data, schema) do
     case parse_only_linked_records(data, schema, []) do
       {records, rest} ->
-        {{existing_records, records}, rest}
+        resp = %{
+          response: existing_records,
+          linked_records: build_linked_records(records)
+        }
+        {resp, rest}
       :incomplete ->
         :incomplete
     end
@@ -503,6 +507,12 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_only_linked_records(_, _schema, _acc) do
     :incomplete
+  end
+
+  defp build_linked_records(records) do
+    for %{rid: rid} = record <- records, into: HashDict.new do
+      {rid, record}
+    end
   end
 
   defp req_code(:shutdown),                          do: 1
