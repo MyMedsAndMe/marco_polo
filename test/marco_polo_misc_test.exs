@@ -271,7 +271,7 @@ defmodule MarcoPoloMiscTest do
     RETURN $edge
     """
 
-    assert {:ok, {[edge], _}} = script(c, "SQL", script)
+    assert {:ok, %{response: [edge]}} = script(c, "SQL", script)
     assert edge.class == "E"
     assert edge.fields["name"] == "lives"
   end
