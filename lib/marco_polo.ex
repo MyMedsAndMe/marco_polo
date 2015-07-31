@@ -740,6 +740,15 @@ defmodule MarcoPolo do
         else
           {:ok, r}
         end
+      {:ok, {record, linked} = r} ->
+        if unknown_property_ids?(record) or unknown_property_ids?(linked) do
+          schema = C.fetch_schema(conn)
+          record = redecode_with_new_schema(record, schema)
+          linked = redecode_with_new_schema(linked, schema)
+          {:ok, {record, linked}}
+        else
+          {:ok, r}
+        end
       o ->
         o
     end
