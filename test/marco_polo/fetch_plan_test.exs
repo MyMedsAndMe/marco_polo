@@ -1,7 +1,9 @@
 defmodule MarcoPolo.FetchPlanTest do
   use ExUnit.Case
 
-  import MarcoPolo.FetchPlan, only: [follow_link: 2]
+  doctest MarcoPolo.FetchPlan
+
+  import MarcoPolo.FetchPlan, only: [follow_link: 2, follow_link!: 2]
   alias MarcoPolo.RID
   alias MarcoPolo.Document, as: Doc
 
@@ -18,9 +20,7 @@ defmodule MarcoPolo.FetchPlanTest do
   end
 
   test "follow_link/2: single link which cannot be followed" do
-    doc = %Doc{rid: @target_rid, class: "Foo"}
-    linked = make_linked([rid_and_doc(rid(-1, -1), %Doc{class: "Bar"})])
-
+    linked = make_linked([rid_and_doc(rid(-1, -1), "Bar")])
     assert follow_link(@target_rid, linked) == :error
   end
 
@@ -50,7 +50,7 @@ defmodule MarcoPolo.FetchPlanTest do
       rid_and_doc(rid(0, 100), "Wat"),
     ])
 
-    assert %{"foo" => %Doc{class: "Foo"}, "bar" => %Doc{class: "Bar"}}
+    assert {:ok, %{"foo" => %Doc{class: "Foo"}, "bar" => %Doc{class: "Bar"}}}
            = follow_link(rids, linked)
   end
 
@@ -63,16 +63,22 @@ defmodule MarcoPolo.FetchPlanTest do
     assert follow_link(rids, linked) == :error
   end
 
-  test "follow_link/2: embedded link bag with all the right links" do
-    rids = {:link_bag, [rid(0, 0), rid(0, 1)]}
+  test "follow_link!/2: behaves like follow link but returns a RecordNotFound error" do
+    rids = %{"foo" => rid(0, 0), "bar" => rid(0, 1)}
     linked = make_linked([
-      rid_and_doc(rid(0, 1), "Foo"),
-      rid_and_doc(rid(0, 99), "Bar"),
-      rid_and_doc(rid(0, 0), "Baz"),
+      rid_and_doc(rid(0, 0), "Foo"),
+      rid_and_doc(rid(0, 1), "Bar"),
+      rid_and_doc(rid(0, 100), "Wat"),
     ])
 
-    assert {:ok, {:link_bag, [%Doc{class: "Baz"}, %Doc{class: "Foo"}]}}
-           = follow_link(rids, linked)
+    assert %{"foo" => %Doc{class: "Foo"}, "bar" => %Doc{class: "Bar"}}
+           = follow_link!(rids, linked)
+
+    error = assert_raise MarcoPolo.FetchPlan.RecordNotFoundError, fn ->
+      follow_link!(rid(99, 99), linked)
+    end
+
+    assert error.message =~ "the linked records don't include one of these RIDs"
   end
 
   defp rid_and_doc(rid, class) do
