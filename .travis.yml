@@ -1,8 +1,23 @@
 language: elixir
+
+env:
+  global:
+    - ORIENTDB_USER=root
+    - ORIENTDB_PASS=root
+  matrix:
+    - ORIENTDB_VERSION="2.1-rc6"
+
 elixir:
   - 1.0.5
+
 otp_release:
   - 17.5
   - 18.0
+
+before_install:
+  - chmod +x ./ci/ci.sh
+  - ./ci/ci.sh
+  - export PATH="$(pwd)/tmp:$PATH"
+
 script:
-  - mix test --exclude integration
+  - mix test.all
