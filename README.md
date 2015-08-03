@@ -159,6 +159,12 @@ edge.fields["in"]  #=> {:link_list, [pizza_place.rid]}
 edge.fields["out"] #=> {:link_list, [jane.rid]}
 ```
 
+The `:graph` atom in the `MarcoPolo.start_link/1` function shuld reflect how the
+database was created. If it was created as a graph database, then we use
+`:graph`, otherwise we use `:document`. The differences between graph and
+document databases are differences in the implementation on the server side; the
+API is exactly the same between the two types.
+
 ## Scripting
 
 OrientDB supports server-side scripting (for example,
