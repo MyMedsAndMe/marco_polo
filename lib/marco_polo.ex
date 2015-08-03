@@ -678,7 +678,7 @@ defmodule MarcoPolo do
 
       iex> ops = [{:create, %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}}},
       ...>        {:delete, %MarcoPolo.Document{rid: %MarcoPolo.RID{cluster_id: 1, position: 2}}]
-      iex> {:ok, %{created: created, updated: []} = MarcoPolo.transaction(conn, ops)
+      iex> {:ok, %{created: [created], updated: []} = MarcoPolo.transaction(conn, ops)
       iex> created
       %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}, rid: %MarcoPolo.RID{...}}
 
