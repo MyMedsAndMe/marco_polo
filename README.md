@@ -179,6 +179,52 @@ for (var i = 1; i <= 10; i++) {
 """)
 ```
 
+## Transactions
+
+OrientDB supports server-side transactions, meaning transactions that happen
+only on the server. The clients sends all the operations it wants to perform in
+the transactions, and the server either performs them all atomically or reverts
+all of them if there's an error in one of them. To perform a transaction in
+MarcoPolo:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :document})
+
+{:ok, resp} = MarcoPolo.transaction(conn, [
+  {:create, %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}}},
+  {:delete, %MarcoPolo.Document{rid: %MarcoPolo.RID{cluster_id: 10, position: 39}}},
+])
+
+resp.created
+#=> %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}, rid: %MarcoPolo.RID{...}}
+
+resp.updated
+#=> []
+```
+
+To perform transactions with manual rollback (similar to the ones in most
+relational databases), you have to use server-side scripting. For example, you
+can perform a transaction by using a SQL script:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :document})
+
+script = """
+begin
+let account = create vertex Account set name = 'Luke'
+let city = select from City where name = 'London' lock record
+let edge = create edge Lives from $account to $city
+commit
+return $edge
+"""
+
+MarcoPolo.script(conn, "SQL", script)
+```
+
 ## Contributing
 
 For more information on how to contribute to MarcoPolo (including how to clone
