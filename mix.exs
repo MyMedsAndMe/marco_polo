@@ -1,7 +1,7 @@
 defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
-  @version "0.0.1-dev"
+  @version "0.1.0"
   @supported_protocol 28
 
   def project do
