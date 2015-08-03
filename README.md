@@ -108,6 +108,34 @@ to that number of links. For example:
 </properties>
 ```
 
+## Fetch plans
+
+MarcoPolo supports OrientDB [fetch plans][odb-fetching-strategies]. Starting with these data:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :document})
+
+{:ok, %{response: country}} = MarcoPolo.command(conn, "INSERT INTO Country(name) VALUES ('USA')")
+
+query = "INSERT INTO City(name, country) VALUES ('New York', ?)"
+{:ok, %{response: city}} = MarcoPolo.command(conn, query, params: [country.rid])
+
+query = "INSERT INTO Street(name, city) VALUES ('5th avenue', ?)"
+{:ok, %{response: street}} = MarcoPolo.command(conn, query, params: [city.rid])
+```
+
+we can fetch the city and the country when we fetch the street:
+
+```elixir
+query = "SELECT FROM Street WHERE name = '5th avenue'"
+{:ok, %{response: [street], linked_records: linked}} = MarcoPolo.command(conn, query, fetch_plan: "*:-1")
+
+ny = MarcoPolo.FetchPlan.resolve_links!(street.fields["city"], linked)
+usa = MarcoPolo.FetchPlan.resolve_links!(ny.fields["country"], linked)
+```
+
 ## Working with graphs
 
 MarcoPolo supports working with graphs using the same `MarcoPolo.command/3`
@@ -161,3 +189,4 @@ the repository and run tests), have a look at the
 [decimal]: https://github.com/ericmj/decimal
 [odb-javascript]: http://orientdb.com/docs/last/Javascript-Command.html
 [odb-sql-batch]: http://orientdb.com/docs/last/SQL-batch.html
+[odb-fetching-strategies]: http://orientdb.com/docs/last/Fetching-Strategies.html
