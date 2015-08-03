@@ -6,6 +6,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
+  import MarcoPolo.Protocol.Protobuf
   import Ser, only: [encode_value: 1, decode_type: 2]
 
   @record_no_fields <<0,           # version
@@ -103,7 +104,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: datetime" do
-    data = :small_ints.encode_zigzag_varint(1435665809901) <> "foo"
+    data = encode_zigzag_varint(1435665809901) <> "foo"
     datetime = %DateTime{year: 2015, month: 6, day: 30,
                          hour: 12, min: 03, sec: 29, msec: 901}
     assert decode_type(data, :datetime) == {datetime, "foo"}
@@ -231,8 +232,8 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
     # ints
     assert bin(encode_value(1)) == <<2>>
-    assert bin(encode_value(1010)) == :small_ints.encode_zigzag_varint(1010)
-    assert bin(encode_value(123456)) == :small_ints.encode_zigzag_varint(123456)
+    assert bin(encode_value(1010)) == encode_zigzag_varint(1010)
+    assert bin(encode_value(123456)) == encode_zigzag_varint(123456)
 
     # floats and doubles
     # (Elixir floats are always encoded as OrientDB doubles - 8 bytes)
@@ -249,7 +250,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   test "encode_value/1: datetime" do
     datetime = %DateTime{year: 2015, month: 6, day: 30,
                          hour: 12, min: 03, sec: 29, msec: 901}
-    assert bin(encode_value(datetime)) == :small_ints.encode_zigzag_varint(1435665809901)
+    assert bin(encode_value(datetime)) == encode_zigzag_varint(1435665809901)
   end
 
   test "encode_value/1: embedded document with no fields" do
@@ -324,7 +325,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   test "encode_value/1: links" do
     rid = %RID{cluster_id: 100, position: 33}
     assert bin(encode_value(rid))
-           == :small_ints.encode_zigzag_varint(100) <> :small_ints.encode_zigzag_varint(33)
+           == encode_zigzag_varint(100) <> encode_zigzag_varint(33)
   end
 
   test "encode_value/1: link lists and sets" do
@@ -332,10 +333,10 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     # results.
     rids     = [%RID{cluster_id: 19, position: 4}, %RID{cluster_id: 0, position: 1}]
     set      = Enum.into(rids, HashSet.new)
-    expected = <<4, :small_ints.encode_zigzag_varint(19) :: binary,
-                    :small_ints.encode_zigzag_varint(4) :: binary,
-                    :small_ints.encode_zigzag_varint(0) :: binary,
-                    :small_ints.encode_zigzag_varint(1) :: binary>>
+    expected = <<4, encode_zigzag_varint(19) :: binary,
+                    encode_zigzag_varint(4) :: binary,
+                    encode_zigzag_varint(0) :: binary,
+                    encode_zigzag_varint(1) :: binary>>
 
     assert bin(encode_value({:link_list, rids})) == expected
     assert bin(encode_value({:link_set, set}))   == expected
@@ -348,11 +349,11 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     }
     expected = <<4, # nkeys, varint
                  7, 6, "foo", # key type + key value
-                 :small_ints.encode_zigzag_varint(1) :: binary,
-                 :small_ints.encode_zigzag_varint(2) :: binary, # rid
+                 encode_zigzag_varint(1) :: binary,
+                 encode_zigzag_varint(2) :: binary, # rid
                  7, 6, "bar", # key type + key value
-                 :small_ints.encode_zigzag_varint(3) :: binary,
-                 :small_ints.encode_zigzag_varint(9) :: binary, # rid
+                 encode_zigzag_varint(3) :: binary,
+                 encode_zigzag_varint(9) :: binary, # rid
                  >>
 
     assert bin(encode_value({:link_map, map})) == expected

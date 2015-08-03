@@ -4,6 +4,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   alias MarcoPolo.Document
   alias MarcoPolo.RID
 
+  import MarcoPolo.Protocol.Protobuf
+
   require Record
   Record.defrecordp :field, [:name, :ptr, :type]
 
@@ -78,7 +80,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     # represents the property id of a property. If it's 0, it signals the end of
     # the header segment.
 
-    case :small_ints.decode_zigzag_varint(data) do
+    case decode_zigzag_varint(data) do
       {0, rest} ->
         {Enum.reverse(acc), rest}
       {i, rest} when i < 0 ->
@@ -144,7 +146,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   def decode_type(<<1>> <> rest, :boolean, _), do: {true, rest}
 
   def decode_type(data, type, _) when type in [:short, :int, :long] do
-    :small_ints.decode_zigzag_varint(data)
+    decode_zigzag_varint(data)
   end
 
   def decode_type(data, :float, _) do
@@ -158,13 +160,13 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, type, _) when type in [:string, :binary] do
-    {len, rest} = :small_ints.decode_zigzag_varint(data)
+    {len, rest} = decode_zigzag_varint(data)
     <<string :: bytes-size(len), rest :: binary>> = rest
     {string, rest}
   end
 
   def decode_type(data, :date, _) do
-    {days, rest} = :small_ints.decode_zigzag_varint(data)
+    {days, rest} = decode_zigzag_varint(data)
     days = :calendar.date_to_gregorian_days(1970, 1, 1) + days
     {y, m, d} = :calendar.gregorian_days_to_date(days)
     {%MarcoPolo.Date{year: y, month: m, day: d}, rest}
@@ -189,7 +191,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :embedded_list, schema) do
-    {nitems, rest}           = :small_ints.decode_zigzag_varint(data)
+    {nitems, rest}           = decode_zigzag_varint(data)
     <<type, rest :: binary>> = rest
 
     # Only ANY is supported by OrientDB at the moment.
@@ -213,14 +215,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :link, _) do
-    {cluster_id, rest} = :small_ints.decode_zigzag_varint(data)
-    {position, rest} = :small_ints.decode_zigzag_varint(rest)
+    {cluster_id, rest} = decode_zigzag_varint(data)
+    {position, rest} = decode_zigzag_varint(rest)
 
     {%RID{cluster_id: cluster_id, position: position}, rest}
   end
 
   def decode_type(data, :link_list, _) do
-    {nelems, rest} = :small_ints.decode_zigzag_varint(data)
+    {nelems, rest} = decode_zigzag_varint(data)
     {elems, rest} = Enum.map_reduce List.duplicate(nil, nelems), rest, fn(_, acc) ->
       decode_type(acc, :link)
     end
@@ -234,7 +236,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   def decode_type(data, :link_map, _) do
-    {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
+    {nkeys, rest} = decode_zigzag_varint(data)
     {pairs, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<type, acc :: binary>>) ->
       # Only string keys are supported
       :string = int_to_type(type)
@@ -287,7 +289,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp decode_map_header(data) do
-    {nkeys, rest} = :small_ints.decode_zigzag_varint(data)
+    {nkeys, rest} = decode_zigzag_varint(data)
 
     Enum.map_reduce List.duplicate(nil, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
       # For now, OrientDB only supports STRING keys.
@@ -374,11 +376,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_type(false, :boolean, _offset), do: <<0>>
 
   defp encode_type(binary, type, _offset) when type in [:string, :binary] do
-    [:small_ints.encode_zigzag_varint(byte_size(binary)), binary]
+    [encode_zigzag_varint(byte_size(binary)), binary]
   end
 
   defp encode_type(i, type, _offset) when type in [:short, :int, :long] do
-    :small_ints.encode_zigzag_varint(i)
+    encode_zigzag_varint(i)
   end
 
   defp encode_type(x, :float, _offset), do: <<x :: 32-float>>
@@ -387,7 +389,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp encode_type(date, :date, _offset) do
      import :calendar, only: [date_to_gregorian_days: 3]
      days = date_to_gregorian_days(date.year, date.month, date.day) - date_to_gregorian_days(1970, 1, 1)
-     :small_ints.encode_zigzag_varint(days)
+     encode_zigzag_varint(days)
   end
 
   defp encode_type(dt, :datetime, _offset) do
@@ -407,7 +409,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       [type_to_int(infer_type(el)), encode_value(el, offset)]
     end
 
-    [:small_ints.encode_zigzag_varint(length(list)), type_to_int(:any), elems]
+    [encode_zigzag_varint(length(list)), type_to_int(:any), elems]
   end
 
   defp encode_type(set, :embedded_set, offset) do
@@ -440,18 +442,18 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     keys   = Enum.reverse(keys)
     values = Enum.reverse(values)
 
-    nkeys = map |> map_size |> :small_ints.encode_zigzag_varint
+    nkeys = map |> map_size |> encode_zigzag_varint
 
     [nkeys, keys, values]
   end
 
   defp encode_type(%RID{cluster_id: id, position: pos}, :link, _offset) do
-    :small_ints.encode_zigzag_varint(id) <> :small_ints.encode_zigzag_varint(pos)
+    encode_zigzag_varint(id) <> encode_zigzag_varint(pos)
   end
 
   defp encode_type(rids, :link_list, offset) do
     [
-      :small_ints.encode_zigzag_varint(length(rids)),
+      encode_zigzag_varint(length(rids)),
       Enum.map(rids, &encode_type(&1, :link, offset))
     ]
   end
@@ -467,7 +469,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
        encode_value(v, offset)]
     end
 
-    [:small_ints.encode_zigzag_varint(map_size(rid_map)), keys_and_values]
+    [encode_zigzag_varint(map_size(rid_map)), keys_and_values]
   end
 
   defp encode_type(rids, :link_bag, _) when is_list(rids) do
@@ -483,7 +485,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
     # `6` means 4 bytes for the pointer to the data, 1 byte for the data type,
     # and 1 byte for the key type.
-    nkeys       = :small_ints.encode_zigzag_varint(Enum.count(keys))
+    nkeys       = encode_zigzag_varint(Enum.count(keys))
     key_lengths = Enum.map(keys, &(IO.iodata_length(encode_value(to_string(&1))) + 6))
 
     byte_size(nkeys) + Enum.sum(key_lengths)

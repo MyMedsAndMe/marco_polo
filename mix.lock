@@ -7,5 +7,4 @@
   "httpoison": {:hex, :httpoison, "0.7.0"},
   "idna": {:hex, :idna, "1.0.2"},
   "poison": {:hex, :poison, "1.4.0"},
-  "small_ints": {:git, "git://github.com/whatyouhide/small_ints.git", "6e6c60a86d11fa176dfc857a8268af57bf409444", []},
   "ssl_verify_hostname": {:hex, :ssl_verify_hostname, "1.0.5"}}
