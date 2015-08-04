@@ -242,3 +242,7 @@ the repository and run tests), have a look at the
 [odb-javascript]: http://orientdb.com/docs/last/Javascript-Command.html
 [odb-sql-batch]: http://orientdb.com/docs/last/SQL-batch.html
 [odb-fetching-strategies]: http://orientdb.com/docs/last/Fetching-Strategies.html
+
+## License
+
+See the [LICENSE](LICENSE) file.
