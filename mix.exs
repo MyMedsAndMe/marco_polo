@@ -8,17 +8,41 @@ defmodule MarcoPolo.Mixfile do
     [app: :marco_polo,
      version: @version,
      elixir: "~> 1.0",
+
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+
+     # Testing
      aliases: ["test.all": "test --include scripting --include integration"],
      preferred_cli_env: ["test.all": :test],
      test_coverage: [tool: Coverex.Task],
+
+     # Hex
+     package: package,
+     description: description,
+
+     # Docs
+     name: "MarcoPolo",
+     source_url: "https://github.com/MyMedsAndMe/marco_polo",
+
      deps: deps]
   end
 
   def application do
     [applications: [:logger],
      env: [supported_protocol: @supported_protocol]]
+  end
+
+  defp package do
+    [contributors: ["Andrea Leopardi"],
+     licenses: ["Apache"],
+     links: %{"GitHub" => "https://github.com/MyMedsAndMe/marco_polo"}]
+  end
+
+  defp description do
+    """
+    Binary driver for the OrientDB database.
+    """
   end
 
   defp deps do
