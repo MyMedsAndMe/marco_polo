@@ -30,14 +30,29 @@ After you have the server running, you can run the test suite:
 All the tests will be run inside a `MarcoPoloTest` database on the server, so be
 sure not to save any important data on it as it will be overwritten.
 
-#### User and password
+### Environment variables
 
-The OrientDB user and password used to connect to the server are read from the
-`$ORIENTB_USER` and `$ORIENTDB_PASS` environment variables, so make sure they're
-set before running tests.
+The MarcoPolo tests rely on some environment variables to be set in order to
+work properly. For example, the OrientDB user and password used to connect to
+the server are read from the `$ORIENTDB_USER` and `$ORIENTDB_PASS` environment
+variables.
 
-#### Scripting
+To make working with environment variables easier, MarcoPolo uses
+[dotenv for Elixir][dotenv_elixir], a library that picks up environment
+variables from a `.env` file in the root of the project. This library is only
+used in the `test` Mix environment. You can copy [`.env.example`](.env.example)
+to `.env` (which is not version-controlled) and mofify the values of the
+variables in it.
 
-OrientDB does not allow server-side scripting by default, so scripring related tests (tagged in ExUnit with the `:scripting` tag) are not run by default. If you enable server-side scripting in the OrienDB server's XML configuration, you can include the `:scripting` tag when running `mix test`:
+### Scripting
+
+OrientDB does not allow server-side scripting by default, so scripring related
+tests (tagged in ExUnit with the `:scripting` tag) are not run by default. If
+you enable server-side scripting (for at least SQL, Javascript and Groovy) in
+the OrienDB server's XML configuration, you can include the `:scripting` tag
+when running `mix test`:
 
     $ mix test --include scripting
+
+
+[dotenv_elixir]: https://github.com/avdi/dotenv_elixir

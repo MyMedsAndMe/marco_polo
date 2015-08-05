@@ -29,7 +29,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger],
+    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: []),
      env: [supported_protocol: @supported_protocol]]
   end
 
@@ -50,6 +50,7 @@ defmodule MarcoPolo.Mixfile do
      {:connection, "1.0.0-rc.1"},
      {:dialyze, "~> 0.2.0", only: :dev},
      {:coverex, "~> 1.4", only: :test},
+     {:dotenv, "~> 1.0", only: :test},
      {:ex_doc, "~> 0.7", only: :docs}]
   end
 end
