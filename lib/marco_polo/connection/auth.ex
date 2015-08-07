@@ -29,6 +29,8 @@ defmodule MarcoPolo.Connection.Auth do
     end
   end
 
+  # Waits for the 2 byte protocol version, checks that the protocol is supported
+  # and stores it in the state.
   defp negotiate_protocol(%{socket: socket, opts: opts} = s) do
     case :gen_tcp.recv(socket, 2, opts[:timeout] || @timeout) do
       {:ok, <<version :: short>>} ->
