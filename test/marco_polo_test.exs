@@ -125,6 +125,7 @@ defmodule MarcoPoloTest do
       assert record.fields == %{"myString" => "record_load"}
     end
 
+    @tag min_orientdb_version: "2.1.0"
     test "load_record/4 using the :if_version_not_latest option", %{conn: c} do
       rid = TestHelpers.record_rid("record_load")
       assert {:ok, {nil, _}} = MarcoPolo.load_record(c, rid, version: 1, if_version_not_latest: true)
