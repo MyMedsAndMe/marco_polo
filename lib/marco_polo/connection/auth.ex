@@ -28,17 +28,17 @@ defmodule MarcoPolo.Connection.Auth do
   @spec connect(state) :: {:ok, state} | {:error, term, state} | {:tcp_error, term, state}
   def connect(s) do
     case negotiate_protocol(s) do
-      :ok                  -> authenticate(s)
-      {:tcp_error, reason} -> {:tcp_error, reason, s}
+      {:ok, s} ->
+        authenticate(s)
+      {:tcp_error, reason} ->
+        {:tcp_error, reason, s}
     end
   end
 
-  defp negotiate_protocol(%{socket: socket, opts: opts}) do
+  defp negotiate_protocol(%{socket: socket, opts: opts} = s) do
     case :gen_tcp.recv(socket, 2, opts[:timeout] || @timeout) do
-      {:ok, <<_protocol :: short>>} ->
-        # TODO decide a protocol support policy, which will most likely be
-        # enforced here.
-        :ok
+      {:ok, <<version :: short>>} ->
+        {:ok, %{s | protocol_version: version}}
       {:error, reason} ->
         {:tcp_error, reason}
     end

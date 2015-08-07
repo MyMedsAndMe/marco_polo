@@ -29,6 +29,9 @@ defmodule MarcoPolo.Connection do
     transaction_id: 1,
     # The options used to start this genserver
     opts: nil,
+    # The protocol (version) that the server this genserver is connected to is
+    # using
+    protocol_version: nil,
   }
 
   ## Client code.
