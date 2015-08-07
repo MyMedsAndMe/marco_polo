@@ -5,7 +5,9 @@ env:
     - ORIENTDB_USER=root
     - ORIENTDB_PASS=root
   matrix:
-    - ORIENTDB_VERSION="2.1-rc6"
+    - ORIENTDB_VERSION="2.0.12"
+    - ORIENTDB_VERSION="2.0.13"
+    - ORIENTDB_VERSION="2.1.0"
 
 elixir:
   - 1.0.5
