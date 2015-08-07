@@ -6,6 +6,7 @@ defmodule MarcoPolo.Connection.Auth do
 
   @typep state :: Map.t
 
+  @min_protocol 28
   @protocol 30
 
   @timeout 5000
@@ -38,6 +39,7 @@ defmodule MarcoPolo.Connection.Auth do
   defp negotiate_protocol(%{socket: socket, opts: opts} = s) do
     case :gen_tcp.recv(socket, 2, opts[:timeout] || @timeout) do
       {:ok, <<version :: short>>} ->
+        check_min_protocol!(version)
         {:ok, %{s | protocol_version: version}}
       {:error, reason} ->
         {:tcp_error, reason}
@@ -85,5 +87,15 @@ defmodule MarcoPolo.Connection.Auth do
             {:ok, %{s | session_id: sid, tail: rest}}
         end
     end
+  end
+
+  defp check_min_protocol!(protocol) when protocol < @min_protocol do
+    raise Error, """
+    the minimum supported protocol is #{@min_protocol}, the server is using #{protocol}
+    """
+  end
+
+  defp check_min_protocol!(_) do
+    :ok
   end
 end
