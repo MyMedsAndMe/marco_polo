@@ -2,7 +2,6 @@ defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
   @version "0.1.0"
-  @supported_protocol 28
 
   def project do
     [app: :marco_polo,
@@ -29,8 +28,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: []),
-     env: [supported_protocol: @supported_protocol]]
+    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: [])]
   end
 
   defp package do
