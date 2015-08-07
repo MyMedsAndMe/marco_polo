@@ -147,6 +147,7 @@ defmodule MarcoPoloMiscTest do
     Logger.add_backend(:console, flush: true)
   end
 
+  @tag min_orientdb_version: "2.1.0"
   test "working with graphs", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS Person EXTENDS V")
     {:ok, _} = command(c, "CREATE CLASS Restaurant EXTENDS V")
@@ -259,7 +260,7 @@ defmodule MarcoPoloMiscTest do
 
   @tag :scripting
   test "batch transaction in a script with the SQL langauge (committing)", %{conn: c} do
-    {:ok, _} = command(c, "CREATE CLASS City")
+    {:ok, _} = command(c, "CREATE CLASS City EXTENDS V")
     {:ok, _} = command(c, "INSERT INTO City(name) VALUES ('London')")
 
     script = """
