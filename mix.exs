@@ -1,6 +1,7 @@
 defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
+  @client_name "MarcoPolo (Elixir driver)"
   @version "0.1.0"
 
   def project do
@@ -28,7 +29,8 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: [])]
+    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: []),
+     env: [client_name: @client_name, version: @version]]
   end
 
   defp package do
