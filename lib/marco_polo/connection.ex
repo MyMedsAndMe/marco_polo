@@ -15,12 +15,20 @@ defmodule MarcoPolo.Connection do
   @timeout 5000
 
   @initial_state %{
+    # The TCP socket to the OrientDB server
     socket: nil,
+    # The session id for the session held by this genserver
     session_id: nil,
+    # The queue of commands sent to the server
     queue: :queue.new,
+    # The schema of the OrientDB database (if we're connected to a db)
     schema: nil,
+    # The tail of binary data from parsing
     tail: "",
+    # A monothonically increasing transaction id (must be unique per session)
     transaction_id: 1,
+    # The options used to start this genserver
+    opts: nil,
   }
 
   ## Client code.
