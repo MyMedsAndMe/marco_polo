@@ -9,16 +9,9 @@ defmodule MarcoPolo.Connection.Auth do
   @min_protocol 28
   @protocol 30
 
-  @timeout 5000
+  @serialization_protocol "ORecordSerializerBinary"
 
-  @connection_args [
-    "OrientDB binary driver for Elixir", # client name
-    "0.0.1-beta",                        # client version
-    {:short, @protocol},                 # protocol number
-    "client id",
-    "ORecordSerializerBinary",           # serialization protocol
-    false,                               # token-based auth, not supported
-  ]
+  @timeout 5000
 
   @doc """
   Authenticate to the OrientDB server to perform server or database operations.
@@ -46,30 +39,45 @@ defmodule MarcoPolo.Connection.Auth do
     end
   end
 
-  defp authenticate(%{opts: opts, socket: socket} = s) do
-    user     = Keyword.fetch!(opts, :user)
-    password = Keyword.fetch!(opts, :password)
-
-    {op, args} = op_and_args_from_connection_type(user, password, Keyword.fetch!(opts, :connection))
-
-    # The first `nil` is for the session id, that is required to be nil (-1) for
-    # first-time connections.
-    req = Protocol.encode_op(op, [nil|@connection_args] ++ args)
+  defp authenticate(%{socket: socket} = s) do
+    {op, args} = op_and_connection_args(s)
+    req = Protocol.encode_op(op, args)
 
     case :gen_tcp.send(socket, req) do
-      :ok              -> wait_for_connection_response(s, op)
-      {:error, reason} -> {:tcp_error, reason, s}
+      :ok ->
+        wait_for_connection_response(s, op)
+      {:error, reason} ->
+        {:tcp_error, reason, s}
     end
   end
 
-  defp op_and_args_from_connection_type(user, password, :server),
-    do: {:connect, [user, password]}
-  defp op_and_args_from_connection_type(user, password, {:db, name, type})
+  defp op_and_connection_args(%{opts: opts, protocol_version: protocol}) do
+    {op, other_args} = op_and_args_from_connection_type(Keyword.fetch!(opts, :connection))
+
+    static_args = [
+      nil, # session id, nil (-1) for first-time connections
+      Application.get_env(:marco_polo, :client_name),
+      Application.get_env(:marco_polo, :version),
+      {:short, protocol},
+      "client id",
+      @serialization_protocol,
+      false, # token-based auth, not supported
+    ]
+
+    user = Keyword.fetch!(opts, :user)
+    password = Keyword.fetch!(opts, :password)
+
+    {op, static_args ++ other_args ++ [user, password]}
+  end
+
+  defp op_and_args_from_connection_type(:server),
+    do: {:connect, []}
+  defp op_and_args_from_connection_type({:db, name, type})
     when type in [:document, :graph],
-    do: {:db_open, [name, Atom.to_string(type), user, password]}
-  defp op_and_args_from_connection_type(_user, _password, {:db, _, type}),
+    do: {:db_open, [name, Atom.to_string(type)]}
+  defp op_and_args_from_connection_type({:db, _, type}),
     do: raise(ArgumentError, "unknown database type: #{inspect type}, valid ones are :document, :graph")
-  defp op_and_args_from_connection_type(_user, _password, _),
+  defp op_and_args_from_connection_type(_type),
     do: raise(ArgumentError, "invalid connection type, valid ones are :server or {:db, name, type}")
 
   defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
