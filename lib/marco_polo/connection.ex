@@ -169,6 +169,7 @@ defmodule MarcoPolo.Connection do
 
   def handle_call({:operation, op_name, args}, from, %{session_id: sid} = s) do
     check_op_is_allowed!(s, op_name)
+    check_op_with_version!(s.protocol_version, op_name)
 
     req = Protocol.encode_op(op_name, [sid|args])
     s
@@ -310,6 +311,24 @@ defmodule MarcoPolo.Connection do
 
   defp do_check_op_is_allowed!(_, _) do
     nil
+  end
+
+  @ops_with_versions %{
+    record_load_if_version_not_latest: 30,
+  }
+
+  for {op, min_version} <- @ops_with_versions do
+    defp check_op_with_version!(current, unquote(op)) when current < unquote(min_version) do
+      raise MarcoPolo.VersionError, """
+      operation #{unquote(op)} is not supported in the current version
+      of the OrientDB binary protocol, (#{current}), only starting with
+      version #{unquote(min_version)}
+      """
+    end
+  end
+
+  defp check_op_with_version!(_current, _op) do
+    :ok
   end
 
   defp next_transaction_id(s) do
