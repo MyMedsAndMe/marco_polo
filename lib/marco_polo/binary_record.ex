@@ -5,8 +5,8 @@ defmodule MarcoPolo.BinaryRecord do
   This struct has the following fields:
 
     * `:rid` - the record id of the record (as a `MarcoPolo.RID`). It's `nil`
-      for new records (not yet stored on the database.
-    * `:contents` - the binary content of the record
+      for new records (not yet stored on the database).
+    * `:contents` - the binary content of the record.
     * `:version` - the version of the record.
 
   """
