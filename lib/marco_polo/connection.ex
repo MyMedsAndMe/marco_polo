@@ -199,6 +199,8 @@ defmodule MarcoPolo.Connection do
   end
 
   def handle_call({:live_query, args, receiver}, from, s) do
+    check_op_is_allowed!(s, :command)
+
     req = Protocol.encode_op(:command, [s.session_id|args])
     s
     |> enqueue({:live_query, from, receiver})
@@ -365,11 +367,10 @@ defmodule MarcoPolo.Connection do
 
   for {op, min_version} <- @ops_with_versions do
     defp check_op_with_version!(current, unquote(op)) when current < unquote(min_version) do
-      raise MarcoPolo.VersionError, """
-      operation #{unquote(op)} is not supported in the current version
-      of the OrientDB binary protocol, (#{current}), only starting with
-      version #{unquote(min_version)}
-      """
+      raise MarcoPolo.VersionError,
+        "operation #{unquote(op)} is not supported in" <>
+        " the current version of the OrientDB binary protocol," <>
+        " (#{current}), only starting with version #{unquote(min_version)}"
     end
   end
 
@@ -386,10 +387,10 @@ defmodule MarcoPolo.Connection do
   end
 
   defp forward_push_data(data, s) do
-    case Protocol.parse_resp(:irrelevant, data, s.schema) do
+    case Protocol.parse_push_data(data, s.schema) do
       :incomplete ->
         %{s | tail: data}
-      {nil, {:ok, {token, resp}}, rest} ->
+      {:ok, {token, resp}, rest} ->
         send_push_data_resp(s, token, resp)
         %{s | tail: rest}
     end

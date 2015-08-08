@@ -41,6 +41,8 @@ defmodule MarcoPolo.Connection.Auth do
     end
   end
 
+  # Sends the authentication data (based on the `opts` in the state) over the
+  # wire and waits for a response.
   defp authenticate(%{socket: socket} = s) do
     {op, args} = op_and_connection_args(s)
     req = Protocol.encode_op(op, args)

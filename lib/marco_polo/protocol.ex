@@ -27,8 +27,8 @@ defmodule MarcoPolo.Protocol do
     | Document.t
     | BinaryRecord.t
 
-  @ok    <<0>>
-  @error <<1>>
+  @ok        <<0>>
+  @error     <<1>>
   @push_data <<3>>
 
   @document ?d
@@ -149,13 +149,6 @@ defmodule MarcoPolo.Protocol do
     case parse_header(data) do
       :incomplete ->
         :incomplete
-      {:ok, :push_data, rest} ->
-        case parse_push_data(rest, schema) do
-          :incomplete ->
-            :incomplete
-          {resp, rest} ->
-            {nil, {:ok, resp}, rest}
-        end
       {:ok, sid, rest} ->
         case parse_resp_contents(op_name, rest, schema) do
           :incomplete ->
@@ -185,12 +178,14 @@ defmodule MarcoPolo.Protocol do
     parse_resp(connection_op, data, %{})
   end
 
+  def parse_push_data(@push_data <> rest, schema) do
+    do_parse_push_data(rest, schema)
+  end
+
   defp parse_header(@ok <> <<sid :: int, rest :: binary>>),
     do: {:ok, sid, rest}
   defp parse_header(@error <> <<sid :: int, rest :: binary>>),
     do: {:error, sid, rest}
-  defp parse_header(@push_data <> rest),
-    do: {:ok, :push_data, rest}
   defp parse_header(_),
     do: :incomplete
 
@@ -533,7 +528,7 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
-  defp parse_push_data(data, schema) do
+  defp do_parse_push_data(data, schema) do
     parsers = [
       &decode_term(&1, :int), # in Java this is Integer.MIN_VALUE, wat
       &decode_term(&1, :byte), # the byte for REQUEST_PUSH_LIVE_QUERY
@@ -544,7 +539,7 @@ defmodule MarcoPolo.Protocol do
       :incomplete ->
         :incomplete
       {[_int_min_value, 81, content], rest} ->
-        {parse_live_query_content(content, schema), rest}
+        {:ok, parse_live_query_content(content, schema), rest}
     end
   end
 
@@ -553,7 +548,7 @@ defmodule MarcoPolo.Protocol do
 
     rid = %RID{cluster_id: cluster_id, position: position}
 
-    record = RecordSerialization.decode(record_content, schema)
+    record = decode_record_by_type(record_type, record_content, schema)
     record = %{record | rid: rid, version: version}
 
     op =
@@ -566,6 +561,14 @@ defmodule MarcoPolo.Protocol do
     resp = {op, record}
 
     {token, resp}
+  end
+
+  defp decode_record_by_type(@document, content, schema) do
+    RecordSerialization.decode(content, schema)
+  end
+
+  defp decode_record_by_type(@binary_record, content, _schema) do
+    %BinaryRecord{contents: content}
   end
 
   defp req_code(:shutdown),                          do: 1
