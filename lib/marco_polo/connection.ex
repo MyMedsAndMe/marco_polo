@@ -6,9 +6,12 @@ defmodule MarcoPolo.Connection do
   require Logger
 
   alias MarcoPolo.Connection.Auth
+  alias MarcoPolo.Connection.LiveQuery
   alias MarcoPolo.Protocol
   alias MarcoPolo.Document
   alias MarcoPolo.Error
+
+  @type state :: %{}
 
   @socket_opts [:binary, active: false, packet: :raw]
 
@@ -231,7 +234,7 @@ defmodule MarcoPolo.Connection do
 
     s =
       if Protocol.live_query_data?(data) do
-        forward_push_data(data, s)
+        LiveQuery.forward_live_query_data(data, s)
       else
         dequeue_and_parse_resp(s, :queue.out(s.queue), data)
       end
@@ -301,7 +304,7 @@ defmodule MarcoPolo.Connection do
 
     case Protocol.parse_resp(:command, data, s.schema) do
       {^sid, {:ok, resp}, rest} ->
-        token = extract_token(resp)
+        token = LiveQuery.extract_token(resp)
         Connection.reply(from, {:ok, token})
         s
         |> Map.put(:tail, rest)
@@ -380,24 +383,5 @@ defmodule MarcoPolo.Connection do
 
   defp next_transaction_id(s) do
     get_and_update_in(s.transaction_id, &{&1, &1 + 1})
-  end
-
-  defp extract_token(%{response: [%Document{fields: %{"token" => token}}]}) do
-    token
-  end
-
-  defp forward_push_data(data, s) do
-    case Protocol.parse_push_data(data, s.schema) do
-      :incomplete ->
-        %{s | tail: data}
-      {:ok, {token, resp}, rest} ->
-        send_push_data_resp(s, token, resp)
-        %{s | tail: rest}
-    end
-  end
-
-  defp send_push_data_resp(%{live_query_tokens: tokens}, token, resp) do
-    receiver = Dict.fetch!(tokens, token)
-    send receiver, {:orientdb_live_query, token, resp}
   end
 end
