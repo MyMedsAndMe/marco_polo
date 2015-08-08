@@ -306,7 +306,7 @@ defmodule MarcoPolo.Connection do
         |> Map.put(:queue, new_queue)
         |> put_in([:live_query_tokens, token], receiver)
       _ ->
-        dequeue_and_parse_resp(s, :queue.in({from, :command}, new_queue), data)
+        dequeue_and_parse_resp(s, {{:value, {from, :command}}, new_queue}, data)
     end
   end
 
