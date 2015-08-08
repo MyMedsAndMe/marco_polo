@@ -295,4 +295,17 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, %{response: nil}} = script(c, "SQL", script)
     assert {:ok, %{response: []}} = command(c, "SELECT FROM Rollbacks")
   end
+
+  @tag :live_query
+  @tag min_orientdb_version: "2.1.0"
+  test "live_query/4", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS LiveQuerying")
+
+    assert {:ok, token} = live_query(c, "LIVE SELECT FROM LiveQuerying", self())
+    assert is_integer(token)
+
+    {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('testing!')")
+
+    assert_receive {:orientdb_live_query, ^token, {:create, doc}}
+  end
 end

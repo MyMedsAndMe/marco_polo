@@ -704,6 +704,26 @@ defmodule MarcoPolo do
     C.operation(conn, :tx_commit, args, opts)
   end
 
+  def live_query(conn, query, receiver, opts \\ []) do
+    command_class_name = Protocol.encode_term("q") # always a query, never a command
+
+    payload = Protocol.encode_list_of_terms [
+      query,
+      -1,
+      opts[:fetch_plan] || @default_fetch_plan,
+      %Document{fields: %{"params" => %{}}},
+    ]
+
+    args = [
+      {:raw, "l"}, # live query mode
+      IO.iodata_length([command_class_name, payload]),
+      {:raw, command_class_name},
+      {:raw, payload},
+    ]
+
+    C.live_query(conn, args, receiver, opts)
+  end
+
   defp encode_query_with_type(:sql_query, query, opts) do
     args = [query,
             -1,

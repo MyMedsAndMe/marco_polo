@@ -32,6 +32,8 @@ defmodule MarcoPolo.Connection do
     # The protocol (version) that the server this genserver is connected to is
     # using
     protocol_version: nil,
+    # Dict of live query tokens to receiver pids
+    live_query_tokens: HashDict.new,
   }
 
   ## Client code.
@@ -79,6 +81,10 @@ defmodule MarcoPolo.Connection do
   @spec no_response_operation(pid, atom, [Protocol.encodable_term]) :: :ok
   def no_response_operation(pid, op_name, args) do
     Connection.cast(pid, {:operation, op_name, args})
+  end
+
+  def live_query(pid, args, receiver, opts) do
+    Connection.call(pid, {:live_query, args, receiver}, opts[:timeout] || @timeout)
   end
 
   @doc """
@@ -188,6 +194,13 @@ defmodule MarcoPolo.Connection do
     |> send_noreply(req)
   end
 
+  def handle_call({:live_query, args, receiver}, from, s) do
+    req = Protocol.encode_op(:command, [s.session_id|args])
+    s
+    |> enqueue({:live_query, from, receiver})
+    |> send_noreply(req)
+  end
+
   @doc false
   def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
     check_op_is_allowed!(s, op_name)
@@ -203,7 +216,15 @@ defmodule MarcoPolo.Connection do
   @doc false
   def handle_info({:tcp, socket, msg}, %{socket: socket} = s) do
     :inet.setopts(socket, active: :once)
-    s = dequeue_and_parse_resp(s, :queue.out(s.queue), s.tail <> msg)
+    data = s.tail <> msg
+
+    s =
+      if Protocol.live_query_data?(data) do
+        forward_push_data(data, s)
+      else
+        dequeue_and_parse_resp(s, :queue.out(s.queue), data)
+      end
+
     {:noreply, s}
   end
 
@@ -261,6 +282,22 @@ defmodule MarcoPolo.Connection do
         schema = parse_schema(schema)
         Connection.reply(from, schema)
         %{s | schema: schema, tail: rest, queue: new_queue}
+    end
+  end
+
+  defp dequeue_and_parse_resp(s, {{:value, {:live_query, from, receiver}}, new_queue}, data) do
+    sid = s.session_id
+
+    case Protocol.parse_resp(:command, data, s.schema) do
+      {^sid, {:ok, resp}, rest} ->
+        token = extract_token(resp)
+        Connection.reply(from, {:ok, token})
+        s
+        |> Map.put(:tail, rest)
+        |> Map.put(:queue, new_queue)
+        |> put_in([:live_query_tokens, token], receiver)
+      _ ->
+        dequeue_and_parse_resp(s, :queue.in({from, :command}, new_queue), data)
     end
   end
 
@@ -333,5 +370,24 @@ defmodule MarcoPolo.Connection do
 
   defp next_transaction_id(s) do
     get_and_update_in(s.transaction_id, &{&1, &1 + 1})
+  end
+
+  defp extract_token(%{response: [%Document{fields: %{"token" => token}}]}) do
+    token
+  end
+
+  defp forward_push_data(data, s) do
+    case Protocol.parse_resp(:irrelevant, data, s.schema) do
+      :incomplete ->
+        %{s | tail: data}
+      {nil, {:ok, {token, resp}}, rest} ->
+        send_push_data_resp(s, token, resp)
+        %{s | tail: rest}
+    end
+  end
+
+  defp send_push_data_resp(%{live_query_tokens: tokens}, token, resp) do
+    receiver = Dict.fetch!(tokens, token)
+    send receiver, {:orientdb_live_query, token, resp}
   end
 end
