@@ -147,6 +147,10 @@ defmodule MarcoPoloMiscTest do
     Logger.add_backend(:console, flush: true)
   end
 
+  # Tagged as >2.1 because 2.0 has a bunch of bugs with the SQL parser and
+  # basically `CREATE EDGE FROM ? TO ?` doesn't work (with an error like
+  # "Argument '?' is not a RecordId in form of string. Format must be:
+  # <cluster-id>:<cluster-position>").
   @tag min_orientdb_version: "2.1.0"
   test "working with graphs", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS Person EXTENDS V")
