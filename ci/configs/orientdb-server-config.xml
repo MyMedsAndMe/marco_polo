@@ -49,7 +49,7 @@
         </handler>
         <handler class="com.orientechnologies.orient.server.plugin.livequery.OLiveQueryPlugin">
             <parameters>
-                <parameter value="false" name="enabled"/>
+                <parameter value="true" name="enabled"/>
             </parameters>
         </handler>
     </handlers>
