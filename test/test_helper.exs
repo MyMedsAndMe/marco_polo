@@ -11,8 +11,8 @@ excluded_versions =
   end
 
 # Ignore scripting tests by default as scripting must be enabled manually in the
-# OrientDB server configuration.
-excludes = excluded_versions ++ [:scripting]
+# OrientDB server configuration. Same goes for Live Query.
+excludes = excluded_versions ++ [:scripting, :live_query]
 ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ excludes)
 
 ExUnit.start()

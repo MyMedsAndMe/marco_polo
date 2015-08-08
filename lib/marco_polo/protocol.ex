@@ -29,6 +29,7 @@ defmodule MarcoPolo.Protocol do
 
   @ok    <<0>>
   @error <<1>>
+  @push_data <<3>>
 
   @document ?d
   @binary_record ?b
@@ -121,6 +122,9 @@ defmodule MarcoPolo.Protocol do
     :incomplete
   end
 
+  def live_query_data?(@push_data <> _), do: true
+  def live_query_data?(_), do: false
+
   @doc """
   Parses the response to a given operation.
 
@@ -145,6 +149,13 @@ defmodule MarcoPolo.Protocol do
     case parse_header(data) do
       :incomplete ->
         :incomplete
+      {:ok, :push_data, rest} ->
+        case parse_push_data(rest, schema) do
+          :incomplete ->
+            :incomplete
+          {resp, rest} ->
+            {nil, {:ok, resp}, rest}
+        end
       {:ok, sid, rest} ->
         case parse_resp_contents(op_name, rest, schema) do
           :incomplete ->
@@ -178,6 +189,8 @@ defmodule MarcoPolo.Protocol do
     do: {:ok, sid, rest}
   defp parse_header(@error <> <<sid :: int, rest :: binary>>),
     do: {:error, sid, rest}
+  defp parse_header(@push_data <> rest),
+    do: {:ok, :push_data, rest}
   defp parse_header(_),
     do: :incomplete
 
@@ -518,6 +531,41 @@ defmodule MarcoPolo.Protocol do
     for %{rid: rid} = record <- records, into: HashDict.new do
       {rid, record}
     end
+  end
+
+  defp parse_push_data(data, schema) do
+    parsers = [
+      &decode_term(&1, :int), # in Java this is Integer.MIN_VALUE, wat
+      &decode_term(&1, :byte), # the byte for REQUEST_PUSH_LIVE_QUERY
+      &decode_term(&1, :bytes), # the list of changes
+    ]
+
+    case GP.parse(data, parsers) do
+      :incomplete ->
+        :incomplete
+      {[_int_min_value, 81, content], rest} ->
+        {parse_live_query_content(content, schema), rest}
+    end
+  end
+
+  defp parse_live_query_content(<<op_type, token :: int, record_type, version :: int, cluster_id :: short, position :: long, rest :: binary>>, schema) do
+    {record_content, <<>>} = decode_term(rest, :bytes)
+
+    rid = %RID{cluster_id: cluster_id, position: position}
+
+    record = RecordSerialization.decode(record_content, schema)
+    record = %{record | rid: rid, version: version}
+
+    op =
+      case op_type do
+        1 -> :update
+        2 -> :delete
+        3 -> :create
+      end
+
+    resp = {op, record}
+
+    {token, resp}
   end
 
   defp req_code(:shutdown),                          do: 1

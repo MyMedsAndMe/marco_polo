@@ -295,4 +295,33 @@ defmodule MarcoPoloMiscTest do
     assert {:ok, %{response: nil}} = script(c, "SQL", script)
     assert {:ok, %{response: []}} = command(c, "SELECT FROM Rollbacks")
   end
+
+  @tag :live_query
+  @tag min_orientdb_version: "2.1.0"
+  test "live_query/4", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS LiveQuerying")
+
+    assert {:ok, token} = live_query(c, "LIVE SELECT FROM LiveQuerying", self())
+    assert is_integer(token)
+
+    {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('test1'), ('test2')")
+    assert_receive {:orientdb_live_query, ^token, {:create, doc}}
+    assert %Document{class: "LiveQuerying", rid: %RID{}, fields: %{"text" => "test1"}} = doc
+
+    assert_receive {:orientdb_live_query, ^token, {:create, doc}}
+    assert %Document{class: "LiveQuerying", rid: %RID{}, fields: %{"text" => "test2"}} = doc
+
+    {:ok, _} = command(c, "UPDATE LiveQuerying SET text = 'updated' WHERE text = 'test1'")
+    assert_receive {:orientdb_live_query, ^token, {:update, doc}}
+    assert doc.fields["text"] == "updated"
+
+    {:ok, _} = command(c, "DELETE FROM LiveQuerying WHERE text = 'updated'")
+    assert_receive {:orientdb_live_query, ^token, {:delete, doc}}
+    assert doc.fields["text"] == "updated"
+
+    assert :ok = live_query_unsubscribe(c, token)
+
+    {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('unsubscribed')")
+    refute_receive {:orientdb_live_query, _, _}
+  end
 end
