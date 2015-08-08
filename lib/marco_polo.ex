@@ -724,6 +724,17 @@ defmodule MarcoPolo do
     C.live_query(conn, args, receiver, opts)
   end
 
+  def live_query_unsubscribe(conn, token) when is_integer(token) do
+    string_token = Integer.to_string(token)
+
+    case command(conn, "LIVE UNSUBSCRIBE #{string_token}") do
+      {:ok, %{response: %Document{fields: %{"unsubscribed" => ^string_token}}}} ->
+        C.live_query_unsubscribe(conn, token)
+      o ->
+        o
+    end
+  end
+
   defp encode_query_with_type(:sql_query, query, opts) do
     args = [query,
             -1,

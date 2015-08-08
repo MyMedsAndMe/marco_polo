@@ -87,6 +87,10 @@ defmodule MarcoPolo.Connection do
     Connection.call(pid, {:live_query, args, receiver}, opts[:timeout] || @timeout)
   end
 
+  def live_query_unsubscribe(pid, token) do
+    Connection.cast(pid, {:live_query_unsubscribe, token})
+  end
+
   @doc """
   Fetch the schema and store it into the state.
 
@@ -211,6 +215,11 @@ defmodule MarcoPolo.Connection do
 
   def handle_cast(:stop, s) do
     {:disconnect, :stop, s}
+  end
+
+  def handle_cast({:live_query_unsubscribe, token}, s) do
+    s = update_in(s.live_query_tokens, &Dict.delete(&1, token))
+    {:noreply, s}
   end
 
   @doc false
