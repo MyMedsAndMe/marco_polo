@@ -13,7 +13,7 @@ defmodule MarcoPolo.Mixfile do
      start_permanent: Mix.env == :prod,
 
      # Testing
-     aliases: ["test.all": "test --include scripting --include live_query"],
+     aliases: ["test.all": &test_all/1],
      preferred_cli_env: ["test.all": :test],
      test_coverage: [tool: Coverex.Task],
 
@@ -52,5 +52,17 @@ defmodule MarcoPolo.Mixfile do
      {:coverex, "~> 1.4", only: :test},
      {:dotenv, "~> 1.0", only: :test},
      {:ex_doc, "~> 0.7", only: :docs}]
+  end
+
+  defp test_all(args) do
+    args = if IO.ANSI.enabled?, do: ["--color"|args], else: ["--no-color"|args]
+    args = ~w(--include scripting) ++ args
+
+    vsn = System.get_env("ORIENTDB_VERSION")
+    if is_nil(vsn) or Version.compare(vsn, "2.1.0") == :ge do
+      args = ~w(--include live_query) ++ args
+    end
+
+    Mix.Task.run "test", args
   end
 end
