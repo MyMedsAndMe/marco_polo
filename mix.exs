@@ -13,7 +13,7 @@ defmodule MarcoPolo.Mixfile do
      start_permanent: Mix.env == :prod,
 
      # Testing
-     aliases: ["test.all": "test --include scripting"],
+     aliases: ["test.all": "test --include scripting --include live_query"],
      preferred_cli_env: ["test.all": :test],
      test_coverage: [tool: Coverex.Task],
 
