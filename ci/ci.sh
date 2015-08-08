@@ -28,7 +28,12 @@ cd "$ODB_DIR"
 echo "==> Setting up OrientDB"
 chmod -R +x ./bin
 
-cp -v "$CI_DIR/configs/orientdb-server-config.xml" ./config/
+if [[ -e "$CI_DIR/configs/orientdb-server-config_${ORIENTDB_VERSION}.xml" ]]; then
+    cp -v "$CI_DIR/configs/orientdb-server-config_${ORIENTDB_VERSION}.xml" ./config/orientdb-server-config.xml
+else
+    cp -v "$CI_DIR/configs/orientdb-server-config.xml" ./config/
+fi
+
 cp -v "$CI_DIR/configs/orientdb-server-log.properties" ./config/
 
 
