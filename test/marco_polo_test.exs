@@ -11,7 +11,7 @@ defmodule MarcoPoloTest do
     Logger.remove_backend(:console, flush: true)
     Process.flag :trap_exit, true
 
-    {:ok, pid} = MarcoPolo.start_link user: "foo", password: "foo", debug: {:log_to_file, "/dev/null"}
+    {:ok, pid} = MarcoPolo.start_link user: "foo", password: "foo"
 
     assert_receive {:EXIT, ^pid, {error, _}}
     assert Exception.message(error) =~ "key :connection not found"
@@ -27,6 +27,20 @@ defmodule MarcoPoloTest do
     assert_receive {:EXIT, ^pid, {error, _}}
 
     msg = "invalid connection type, valid ones are :server or {:db, name, type}"
+    assert Exception.message(error) == msg
+
+    Logger.add_backend(:console, flush: true)
+  end
+
+  test "start_link/1: raises if the database type is not :document or :graph" do
+    Process.flag :trap_exit, true
+    Logger.remove_backend(:console, flush: true)
+
+    {{error, _}, _} = catch_exit(
+      MarcoPolo.start_link(user: "foo", password: "foo", connection: {:db, "foo", "doc"})
+    )
+
+    msg = ~s(unknown database type: "doc", valid ones are :document, :graph)
     assert Exception.message(error) == msg
 
     Logger.add_backend(:console, flush: true)
