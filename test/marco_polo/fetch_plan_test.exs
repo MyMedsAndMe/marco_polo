@@ -9,7 +9,7 @@ defmodule MarcoPolo.FetchPlanTest do
 
   @target_rid %RID{cluster_id: 31, position: 415}
 
-  test "follow_link/2: single link which can be followed" do
+  test "resolve_links/2: single link which can be followed" do
     doc = %Doc{rid: @target_rid, class: "Foo"}
     linked = make_linked([
       rid_and_doc(@target_rid, doc.class),
