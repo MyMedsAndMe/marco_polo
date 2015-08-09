@@ -46,6 +46,29 @@ defmodule MarcoPoloTest do
     Logger.add_backend(:console, flush: true)
   end
 
+  test "stop/1" do
+    {:ok, pid} = MarcoPolo.start_link(
+      user: TestHelpers.user,
+      password: TestHelpers.password,
+      connection: :server
+    )
+
+    assert Process.alive?(pid)
+
+    MarcoPolo.stop(pid)
+
+    assert_pid_will_die(pid)
+  end
+
+  defp assert_pid_will_die(pid) do
+    if Process.alive?(pid) do
+      :timer.sleep 20
+      assert_pid_will_die(pid)
+    else
+      refute Process.alive?(pid)
+    end
+  end
+
   defmodule ConnectedToServer do
     use ExUnit.Case, async: true
     @moduletag :integration
