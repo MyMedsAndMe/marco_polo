@@ -59,7 +59,7 @@ defmodule MarcoPolo.Mixfile do
     args = ~w(--include scripting) ++ args
 
     vsn = System.get_env("ORIENTDB_VERSION")
-    if is_nil(vsn) or Version.compare(vsn, "2.1.0") == :ge do
+    if is_nil(vsn) or Version.compare(vsn, "2.1.0") in [:eq, :gt] do
       args = ~w(--include live_query) ++ args
     end
 
