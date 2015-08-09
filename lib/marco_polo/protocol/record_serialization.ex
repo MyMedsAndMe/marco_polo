@@ -21,7 +21,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   protocol. This happens because this function is usually called from the parser
   that parsed the byte array.
   """
-  @spec decode(binary, Dict.t) :: MarcoPolo.rec | :unknown_property_id
+  @spec decode(binary, Dict.t) :: Document.t | :unknown_property_id
   def decode(data, schema \\ %{}) do
     <<_serialization_version, rest :: binary>> = data
 

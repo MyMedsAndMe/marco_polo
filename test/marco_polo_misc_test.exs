@@ -189,7 +189,7 @@ defmodule MarcoPoloMiscTest do
   test "transactions", %{conn: c} do
     {:ok, %{response: cluster_id}} =
       command(c, "CREATE CLASS TransactionsTest")
-    {:ok, %{response: [doc1, doc2, doc3]}} =
+    {:ok, %{response: [_doc1, doc2, doc3]}} =
       command(c, "INSERT INTO TransactionsTest(f) VALUES (1), (2), (3)")
 
     doc2 = %{doc2 | fields: Map.update!(doc2.fields, "f", &(&1 * 100))}

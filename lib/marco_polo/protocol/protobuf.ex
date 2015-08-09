@@ -3,11 +3,19 @@ defmodule MarcoPolo.Protocol.Protobuf do
 
   require Bitwise
 
+  @doc """
+  Decodes a varint and then decodes that varint with ZigZag.
+  """
+  @spec decode_zigzag_varint(binary) :: {integer, binary}
   def decode_zigzag_varint(data) do
     {i, rest} = decode_varint(data)
     {decode_zigzag(i), rest}
   end
 
+  @doc """
+  Encodes an int with ZigZag and then encodes the result with varint.
+  """
+  @spec encode_zigzag_varint(integer) :: binary
   def encode_zigzag_varint(i) do
     i |> encode_zigzag |> encode_varint
   end

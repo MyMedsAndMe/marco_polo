@@ -99,7 +99,7 @@ defmodule MarcoPolo.Connection do
 
   Always returns `:ok` without waiting for the schema to be fetched.
   """
-  @spec fetch_schema(pid) :: :ok
+  @spec fetch_schema(pid) :: Dict.t
   def fetch_schema(pid) do
     Connection.call(pid, :fetch_schema)
   end
