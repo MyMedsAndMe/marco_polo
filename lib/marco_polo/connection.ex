@@ -290,8 +290,8 @@ defmodule MarcoPolo.Connection do
     case Protocol.parse_resp(:record_load, data, s.schema) do
       :incomplete ->
         %{s | tail: data}
-      {^sid, {:error, _}, _rest} ->
-        raise "couldn't fetch schema"
+      {^sid, {:error, reason}, _rest} ->
+        raise Error, "couldn't fetch the schema because: #{inspect reason}"
       {^sid, {:ok, {schema, _linked_records}}, rest} ->
         schema = parse_schema(schema)
         Connection.reply(from, schema)
