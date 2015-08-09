@@ -589,7 +589,7 @@ defmodule MarcoPolo do
         :sql_command -> "c"
       end
 
-    command_class_name = Protocol.encode_term(command_class_name)
+    command_class_name = Protocol.Types.encode(command_class_name)
 
     payload = encode_query_with_type(query_type, query, opts)
 
@@ -634,9 +634,9 @@ defmodule MarcoPolo do
   """
   @spec script(pid, String.t, String.t, Keyword.t) :: {:ok, term} | {:error, term}
   def script(conn, language, text, opts \\ []) do
-    command_class_name = Protocol.encode_term("s")
+    command_class_name = Protocol.Types.encode("s")
 
-    payload = [Protocol.encode_term(language),
+    payload = [Protocol.Types.encode(language),
                encode_query_with_type(:sql_command, text, opts)]
 
     args = [{:raw, "s"}, # synchronous mode
@@ -755,9 +755,9 @@ defmodule MarcoPolo do
   """
   @spec live_query(pid, String.t, pid, Keyword.t) :: {:ok, integer} | {:error, term}
   def live_query(conn, query, receiver, opts \\ []) do
-    command_class_name = Protocol.encode_term("q") # always a query, never a command
+    command_class_name = Protocol.Types.encode("q") # always a query, never a command
 
-    payload = Protocol.encode_list_of_terms [
+    payload = Protocol.Types.encode_list [
       query,
       -1,
       opts[:fetch_plan] || @default_fetch_plan,
@@ -808,7 +808,7 @@ defmodule MarcoPolo do
             opts[:fetch_plan] || @default_fetch_plan,
             %Document{class: nil, fields: %{"params" => to_params(opts[:params] || %{})}}]
 
-    Protocol.encode_list_of_terms(args)
+    Protocol.Types.encode_list(args)
   end
 
   defp encode_query_with_type(:sql_command, query, opts) do
@@ -824,7 +824,7 @@ defmodule MarcoPolo do
 
     args = args ++ [false]
 
-    Protocol.encode_list_of_terms(args)
+    Protocol.Types.encode_list(args)
   end
 
   defp refetching_schema(conn, fun) do
