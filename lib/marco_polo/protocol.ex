@@ -461,6 +461,7 @@ defmodule MarcoPolo.Protocol do
 
     op =
       case op_type do
+        0 -> :load
         1 -> :update
         2 -> :delete
         3 -> :create
