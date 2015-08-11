@@ -231,18 +231,57 @@ return $edge
 MarcoPolo.script(conn, "SQL", script)
 ```
 
+## Live query
+
+**Note**: this is an *experimental feature in OrientDB*, and thus subject to
+frequent changes. It should be considered experimental in MarcoPolo as well.
+
+[Live Queries][odb-live-query] are OrientDB's take on PubSub. A client starts
+"watching" a given query, and OrientDB sends messages to that client every time
+something happens that changes the result of the query. For example, a `LIVE
+SELECT FROM Person` query subscribes to the `SELECT FROM Person` query. If a
+client adds record to `Person`, then all clients subscribed to that query get a
+message that says a new `Person` has been created. Subscriptions are identified
+by tokens.
+
+All of this is pretty straightforward in MarcoPolo:
+
+```elixir
+{:ok, conn} = MarcoPolo.start_link(user: "root",
+                                   password: "root",
+                                   connection: {:db, "GratefulDeadConcerts", :document})
+
+# Let's keep the token around so that we can unsubscribe later
+{:ok, token} = MarcoPolo.live_query(conn, "LIVE SELECT FROM Person", self())
+
+# The third argument to live_query/3 is the pid that will receive messages from
+# the live query
+MarcoPolo.command(conn, "INSERT INTO Person(name) VALUES ('Olivia Dunham')")
+receive do msg -> msg end
+#=> {:orientdb_live_query, token, {:create, %MarcoPolo.Document{class: "Person", ...}}}
+
+MarcoPolo.command(conn, "UPDATE Person SET name = 'Fauxlivia Dunham' WHERE name = 'Olivia Dunham'")
+receive do msg -> msg end
+#=> {:orientdb_live_query, token, {:update, %MarcoPolo.Document{class: "Person", ...}}}
+
+# Ok, enough with Fringe references
+:ok = MarcoPolo.live_query_unsubscribe(conn, token)
+```
+
 ## Contributing
 
 For more information on how to contribute to MarcoPolo (including how to clone
 the repository and run tests), have a look at the
 [CONTRIBUTING](CONTRIBUTING.md) file.
 
+## License
+
+See the [LICENSE](LICENSE) file.
+
+
 [docs]: http://hexdocs.pm/marco_polo
 [decimal]: https://github.com/ericmj/decimal
 [odb-javascript]: http://orientdb.com/docs/last/Javascript-Command.html
 [odb-sql-batch]: http://orientdb.com/docs/last/SQL-batch.html
 [odb-fetching-strategies]: http://orientdb.com/docs/last/Fetching-Strategies.html
-
-## License
-
-See the [LICENSE](LICENSE) file.
+[odb-live-query]: https://orientdb.com/docs/last/Live-Query.html
