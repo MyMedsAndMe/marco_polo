@@ -294,6 +294,14 @@ defmodule MarcoPoloTest do
       assert is_integer(v2)
     end
 
+    test "transaction/3: updating/deleting a record with no :version raises", %{conn: c} do
+      doc = %MarcoPolo.Document{version: nil, rid: %MarcoPolo.RID{cluster_id: 1, position: 1}}
+
+      assert_raise MarcoPolo.Error, fn ->
+        MarcoPolo.transaction(c, [{:delete, doc}])
+      end
+    end
+
     @tag :scripting
     test "script/4", %{conn: c} do
       script = """

@@ -686,7 +686,7 @@ defmodule MarcoPolo do
   @spec transaction(pid, [tx_operation], Keyword.t) ::
     {:ok, %{created: [{RID.t, non_neg_integer}], updated: [{RID.t, non_neg_integer}]}} |
     {:error, term}
-  def transaction(conn, operations, opts \\ []) do
+  def transaction(conn, operations, opts \\ []) when is_list(operations) do
     {op_args, _index} = Enum.flat_map_reduce operations, -2, fn
       {:create, _} = op, i ->
         {args_from_tx_operation(op, i, opts), i - 1}
@@ -921,6 +921,10 @@ defmodule MarcoPolo do
   end
 
   defp args_from_tx_operation({:update, %{__struct__: _, rid: %RID{} = rid} = record}, _incr_position, opts) do
+    unless record.version do
+      raise MarcoPolo.Error, "missing :version in the record #{inspect record}"
+    end
+
     [
       {:raw, <<1>>}, # continue to read records
       {:raw, <<@tx_operation_types.update>>},
@@ -934,6 +938,10 @@ defmodule MarcoPolo do
   end
 
   defp args_from_tx_operation({:delete, %{__struct__: _, rid: %RID{} = rid} = record}, _incr_position, _opts) do
+    unless record.version do
+      raise MarcoPolo.Error, "missing :version in the record #{inspect record}"
+    end
+
     [
       {:raw, <<1>>}, # continue to read records
       {:raw, <<@tx_operation_types.delete>>},
