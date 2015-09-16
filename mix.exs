@@ -51,7 +51,7 @@ defmodule MarcoPolo.Mixfile do
      {:dialyze, "~> 0.2.0", only: :dev},
      {:coverex, "~> 1.4", only: :test},
      {:dotenv, "~> 1.0", only: :test},
-     {:ex_doc, "~> 0.7", only: :docs}]
+     {:ex_doc, "~> 0.9", only: :docs}]
   end
 
   defp test_all(args) do
