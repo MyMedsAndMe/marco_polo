@@ -305,18 +305,18 @@ defmodule MarcoPoloMiscTest do
     assert is_integer(token)
 
     {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('test1'), ('test2')")
-    assert_receive {:orientdb_live_query, ^token, {:create, doc}}
+    assert_receive {:orientdb_live_query, ^token, {:create, doc}}, 1_000
     assert %Document{class: "LiveQuerying", rid: %RID{}, fields: %{"text" => "test1"}} = doc
 
-    assert_receive {:orientdb_live_query, ^token, {:create, doc}}
+    assert_receive {:orientdb_live_query, ^token, {:create, doc}}, 1_000
     assert %Document{class: "LiveQuerying", rid: %RID{}, fields: %{"text" => "test2"}} = doc
 
     {:ok, _} = command(c, "UPDATE LiveQuerying SET text = 'updated' WHERE text = 'test1'")
-    assert_receive {:orientdb_live_query, ^token, {:update, doc}}
+    assert_receive {:orientdb_live_query, ^token, {:update, doc}}, 1_000
     assert doc.fields["text"] == "updated"
 
     {:ok, _} = command(c, "DELETE FROM LiveQuerying WHERE text = 'updated'")
-    assert_receive {:orientdb_live_query, ^token, {:delete, doc}}
+    assert_receive {:orientdb_live_query, ^token, {:delete, doc}}, 1_000
     assert doc.fields["text"] == "updated"
 
     assert :ok = live_query_unsubscribe(c, token)
