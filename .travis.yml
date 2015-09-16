@@ -8,6 +8,7 @@ env:
     - ORIENTDB_VERSION="2.0.12"
     - ORIENTDB_VERSION="2.0.13"
     - ORIENTDB_VERSION="2.1.0"
+    - ORIENTDB_VERSION="2.1.2"
 
 elixir:
   - 1.0.5
