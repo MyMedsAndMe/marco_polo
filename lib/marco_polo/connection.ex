@@ -51,11 +51,11 @@ defmodule MarcoPolo.Connection do
     # one is the list of options being passed to `Connection.start_link` (e.g.,
     # `:name` or `:timeout`).
     case Connection.start_link(__MODULE__, opts, opts) do
-      {:error, _} = err ->
-        err
       {:ok, pid} = res ->
         maybe_fetch_schema(pid, opts)
         res
+      {:error, _} = err ->
+        err
     end
   end
 
@@ -144,13 +144,8 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
-  def disconnect(:stop, %{socket: nil} = s) do
+  def disconnect(:stop, s) do
     {:stop, :normal, s}
-  end
-
-  def disconnect(:stop, %{socket: socket} = s) do
-    :gen_tcp.close(socket)
-    {:stop, :normal, %{s | socket: nil}}
   end
 
   def disconnect(error, s) do
@@ -166,6 +161,8 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def handle_call(op, from, s)
+
   # No socket means there's no TCP connection, we can return an error to the
   # client.
   def handle_call(_call, _from, %{socket: nil} = s) do
@@ -184,38 +181,36 @@ defmodule MarcoPolo.Connection do
     check_op_is_allowed!(s, op_name)
     check_op_with_version!(s.protocol_version, op_name)
 
-    req = Protocol.encode_op(op_name, [sid|args])
     s
     |> enqueue({from, op_name})
-    |> send_noreply(req)
+    |> send_noreply(Protocol.encode_op(op_name, [sid|args]))
   end
 
   def handle_call(:fetch_schema, from, %{session_id: sid} = s) do
     check_op_is_allowed!(s, :record_load)
 
     args = [sid, {:short, 0}, {:long, 1}, "*:-1", true, false]
-    req = Protocol.encode_op(:record_load, args)
 
     s
     |> enqueue({:fetch_schema, from})
-    |> send_noreply(req)
+    |> send_noreply(Protocol.encode_op(:record_load, args))
   end
 
   def handle_call({:live_query, args, receiver}, from, s) do
     check_op_is_allowed!(s, :command)
 
-    req = Protocol.encode_op(:command, [s.session_id|args])
     s
     |> enqueue({:live_query, from, receiver})
-    |> send_noreply(req)
+    |> send_noreply(Protocol.encode_op(:command, [s.session_id|args]))
   end
 
   @doc false
+  def handle_cast(op, s)
+
   def handle_cast({:operation, op_name, args}, %{session_id: sid} = s) do
     check_op_is_allowed!(s, op_name)
 
-    req = Protocol.encode_op(op_name, [sid|args])
-    send_noreply(s, req)
+    send_noreply(s, Protocol.encode_op(op_name, [sid|args]))
   end
 
   def handle_cast(:stop, s) do
@@ -228,6 +223,8 @@ defmodule MarcoPolo.Connection do
   end
 
   @doc false
+  def handle_info(msg, s)
+
   def handle_info({:tcp, socket, msg}, %{socket: socket} = s) do
     :inet.setopts(socket, active: :once)
     data = s.tail <> msg
@@ -244,6 +241,10 @@ defmodule MarcoPolo.Connection do
 
   def handle_info({:tcp_closed, socket}, %{socket: socket} = s) do
     {:disconnect, {:error, :closed}, s}
+  end
+
+  def handle_info({:tcp_error, socket, reason}, %{socket: socket} = s) do
+    {:disconnect, {:error, reason}, s}
   end
 
   # Helper functions.
@@ -273,15 +274,13 @@ defmodule MarcoPolo.Connection do
 
   defp send_noreply(%{socket: socket} = s, req) do
     case :gen_tcp.send(socket, req) do
-      :ok ->
-        {:noreply, s}
-      {:error, _reason} = error ->
-        {:disconnect, error, s}
+      :ok                       -> {:noreply, s}
+      {:error, _reason} = error -> {:disconnect, error, s}
     end
   end
 
   defp enqueue(s, what) do
-    update_in s.queue, &:queue.in(what, &1)
+    update_in(s.queue, &:queue.in(what, &1))
   end
 
   defp dequeue_and_parse_resp(s, {{:value, {:fetch_schema, from}}, new_queue}, data) do

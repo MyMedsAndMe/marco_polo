@@ -6,6 +6,9 @@ defmodule MarcoPolo.FetchPlan do
   alias MarcoPolo.RID
 
   defmodule RecordNotFoundError do
+    @moduledoc """
+    Raised when a record is not found in a set of linked records.
+    """
     defexception [:message]
   end
 
@@ -15,7 +18,7 @@ defmodule MarcoPolo.FetchPlan do
   `linked` is a dict with RIDs as keys and OrientDB records
   (`MarcoPolo.Document` and `MarcoPolo.BinaryRecord` structs) as values. Each
   RID key is the RID of the record in the corresponding value. Usually, this
-  list is the set of linked records that some functions from the `MarcoPolo`
+  dict is the set of linked records that some functions from the `MarcoPolo`
   return alongside the queried records; what records get in this set depends on
   the fetch plan used in the query.
 
@@ -50,12 +53,9 @@ defmodule MarcoPolo.FetchPlan do
       :error
 
   """
-  @spec resolve_links(RID.t, [MarcoPolo.rec])
-    :: {:ok, MarcoPolo.rec} | :error
-  @spec resolve_links([RID.t], [MarcoPolo.rec])
-    :: {:ok, [MarcoPolo.rec]} | :error
-  @spec resolve_links(%{term => RID.t}, [MarcoPolo.rec])
-    :: {:ok, %{term => MarcoPolo.rec}} | :error
+  @spec resolve_links(RID.t, [MarcoPolo.rec]) :: {:ok, MarcoPolo.rec} | :error
+  @spec resolve_links([RID.t], [MarcoPolo.rec]) :: {:ok, [MarcoPolo.rec]} | :error
+  @spec resolve_links(%{term => RID.t}, [MarcoPolo.rec]) :: {:ok, %{term => MarcoPolo.rec}} | :error
   def resolve_links(rids, linked)
 
   def resolve_links(%RID{} = rid, linked) do

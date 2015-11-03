@@ -1,4 +1,8 @@
 defmodule MarcoPolo.Error do
+  @moduledoc """
+  Raised for errors happening on the server.
+  """
+
   defexception message: nil, errors: []
 
   @type t :: %__MODULE__{

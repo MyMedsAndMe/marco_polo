@@ -56,7 +56,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
 
   # Decodes a document (ODocument). This ODocument can be a "top-level" document
   # or an "embedded" type, since the leading serialization version byte is not
-  # decoded here (but in `decode/1`).
+  # decoded here (but in `decode/2`).
   defp decode_embedded(data, schema) do
     {class_name, rest} = decode_type(data, :string)
 

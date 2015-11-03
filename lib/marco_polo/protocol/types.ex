@@ -1,11 +1,11 @@
 defmodule MarcoPolo.Protocol.Types do
+  @moduledoc false
+
   alias MarcoPolo.Document
   alias MarcoPolo.BinaryRecord
   alias MarcoPolo.Protocol.RecordSerialization
 
   import MarcoPolo.Protocol.BinaryHelpers
-
-  @moduledoc false
 
   @type encodable_term ::
     boolean

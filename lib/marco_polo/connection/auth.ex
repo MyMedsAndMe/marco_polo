@@ -16,8 +16,8 @@ defmodule MarcoPolo.Connection.Auth do
   @doc """
   Authenticate to the OrientDB server to perform server or database operations.
 
-  The type of connection (ultimately distinguishing between REQUEST_CONNECT and
-  REQUEST_DB_OPEN) is stored in `opts[:connection]`, which is required.
+  The type of connection (either a `REQUEST_CONNECT` or a `REQUEST_DB_OPEN`) is
+   stored in `opts[:connection]`. `:connection` is a required key in the options.
   """
   @spec connect(state) :: {:ok, state} | {:error, term, state} | {:tcp_error, term, state}
   def connect(s) do

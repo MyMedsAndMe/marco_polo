@@ -1,10 +1,8 @@
 defmodule MarcoPolo.RIDTest do
-  use ExUnit.Case
-
-  alias MarcoPolo.RID
+  use ExUnit.Case, async: true
 
   test "RIDs are inspectable" do
-    rid = %RID{cluster_id: 9, position: 143}
+    rid = %MarcoPolo.RID{cluster_id: 9, position: 143}
     assert inspect(rid) == "#MarcoPolo.RID<#9:143>"
   end
 end
