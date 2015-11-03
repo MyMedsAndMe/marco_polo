@@ -40,6 +40,24 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
                           10, "value",
                           >>
 
+  @record_with_junk_bytes <<0,
+                          8, "User",
+                          45, 0, 0, 0, 67,
+                          8, "name", 0, 0, 0, 69, 7,
+                          34, "out_FriendRequest", 0, 0, 0, 78, 22,
+                          32, "in_FriendRequest", 0, 0, 0, 103, 22,
+                          0, # end of header
+                          2, 51, # property 45 (a string) = "3"
+                          16, 72, 101, 114, 109, 105, 111, 110, 101, # name = "Hermione"
+                          1, # ridbag...
+                            0, 0, 0, 1, # ...with one element...
+                            0, 13, 0, 0, 0, 0, 0, 0, 0, 1, # ...with this rid
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # junk bytes
+                          1, # ridbag...
+                            0, 0, 0, 1, # ...with one element...
+                            0, 13, 0, 0, 0, 0, 0, 0, 0, 3 # ...with this rid
+                          >>
+
   @list <<4,            # number of items (zigzag, hence 2)
           23,           # type of the elems in the list, OrientDB only supports ANY
           7, 8, "elem", # elem type (string) + value
@@ -71,6 +89,21 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     record = %Document{class: "foo", fields: %{"prop" => "value"}}
     schema = %{global_properties: %{0 => {"prop", "STRING"}}}
     assert Ser.decode(@record_with_property, schema) == record
+  end
+
+  test "decode/2: record with junk bytes in it" do
+    # Junk bytes should be ignored because pointers in the headers are used.
+
+    schema = %{global_properties: %{22 => {"oauth_id", "STRING"}}}
+
+    assert_raise MarcoPolo.Error, ~r/Tree-based/, fn ->
+      Ser.decode(@record_with_junk_bytes, schema)
+    end
+
+    flunk """
+    This test would pass because I found the right error it should raise. But it
+    shouldn't raise that error in the first place :).
+    """
   end
 
   test "decode_type/2: simple types" do
