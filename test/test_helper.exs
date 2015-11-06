@@ -19,28 +19,25 @@ ExUnit.start()
 
 unless :integration in ExUnit.configuration[:exclude] do
   unless System.get_env("ORIENTDB_USER") do
-    IO.puts IO.ANSI.format([:red, """
+    Mix.raise """
     The $ORIENTDB_USER variable is empty, but it needs to be set to an
     OrientDB admin username in order to run MarcoPolo tests.
-    """])
-    System.halt(1)
+    """
   end
 
   unless System.get_env("ORIENTDB_PASS") do
-    IO.puts IO.ANSI.format([:red, """
+    Mix.raise """
     The $ORIENTDB_PASS variable is empty, but it needs to be set to the
     password for the user specified in the $ORIENTDB_USER variable in order to
     run MarcoPolo tests.
-    """])
-    System.halt(1)
+    """
   end
 
   case :gen_tcp.connect('localhost', 2424, []) do
     {:ok, _} ->
       :ok
     {:error, reason} ->
-      msg = "Error connecting to OrientDB in test_helper.exs: #{:inet.format_error(reason)}"
-      IO.puts(:stderr, msg) && System.halt(1)
+      Mix.raise "Error connecting to OrientDB in test_helper.exs: #{:inet.format_error(reason)}"
   end
 
   clusters = []
@@ -49,7 +46,7 @@ unless :integration in ExUnit.configuration[:exclude] do
   run_script = fn(script) ->
     case System.cmd("orientdb-console", [script], stderr_to_stdout: true) do
       {lines, 0}   -> lines
-      {err, _status} -> raise """
+      {err, _status} -> Mix.raise """
       Database setup in test/test_helper.exs failed:
       #{err}
       """

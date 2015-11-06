@@ -7,7 +7,6 @@ defmodule MarcoPolo.Connection.Auth do
   @typep state :: Map.t
 
   @min_protocol 28
-  @protocol 30
 
   @serialization_protocol "ORecordSerializerBinary"
 
