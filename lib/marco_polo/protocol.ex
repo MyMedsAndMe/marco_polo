@@ -105,7 +105,7 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_errors(<<1, rest :: binary>>, acc) do
-    case GP.parse(rest, [&decode(&1, :string), &decode(&1, :string)]) do
+    case GP.parse(rest, [dec_fn(:string), dec_fn(:string)]) do
       {[class, message], rest} -> parse_errors(rest, [{class, message}|acc])
       :incomplete              -> :incomplete
     end
@@ -119,19 +119,19 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:connect, data, _) do
-    GP.parse(data, [&decode(&1, :int), &decode(&1, :bytes)])
+    GP.parse(data, [dec_fn(:int), dec_fn(:bytes)])
   end
 
   defp parse_resp_contents(:db_open, data, _) do
     parsers = [
-      &decode(&1, :int),   # sid
-      &decode(&1, :bytes), # token
+      dec_fn(:int), # sid
+      dec_fn(:bytes), # token
       GP.array_parser(
-        &decode(&1, :short),                       # number of clusters
-        [&decode(&1, :string), &decode(&1, :short)] # cluster name + cluster id
+        dec_fn(:short), # number of clusters
+        [dec_fn(:string), dec_fn(:short)] # cluster name + cluster id
       ),
-      &decode(&1, :bytes), # cluster config
-      &decode(&1, :string), # orientdb release
+      dec_fn(:bytes), # cluster config
+      dec_fn(:string), # orientdb release
     ]
 
     case GP.parse(data, parsers) do
@@ -156,8 +156,7 @@ defmodule MarcoPolo.Protocol do
   defp parse_resp_contents(:db_countrecords, data, _), do: decode(data, :long)
 
   defp parse_resp_contents(:db_reload, data, _) do
-    cluster_parsers = [&decode(&1, :string), &decode(&1, :short)]
-    array_parser    = GP.array_parser(&decode(&1, :short), cluster_parsers)
+    array_parser = GP.array_parser(dec_fn(:short), [dec_fn(:string), dec_fn(:short)])
     GP.parse(data, array_parser)
   end
 
@@ -170,9 +169,9 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_create, data, _) do
     parsers = [
-      &decode(&1, :short), # cluster id
-      &decode(&1, :long),  # cluster position
-      &decode(&1, :int),   # version
+      dec_fn(:short), # cluster id
+      dec_fn(:long),  # cluster position
+      dec_fn(:int),   # version
       &parse_collection_changes/1,
     ]
 
@@ -186,7 +185,7 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_contents(:record_update, data, _) do
     parsers = [
-      &decode(&1, :int), # version
+      dec_fn(:int), # version
       &parse_collection_changes/1,
     ]
 
@@ -209,17 +208,17 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_contents(:tx_commit, data, _) do
-    created_parser = GP.array_parser(&decode(&1, :int), [
-      &decode(&1, :short), # client cluster id
-      &decode(&1, :long), # client cluster position
-      &decode(&1, :short), # cluster id
-      &decode(&1, :long), # cluster position
+    created_parser = GP.array_parser(dec_fn(:int), [
+      dec_fn(:short), # client cluster id
+      dec_fn(:long), # client cluster position
+      dec_fn(:short), # cluster id
+      dec_fn(:long), # cluster position
     ])
 
-    updated_parser = GP.array_parser(&decode(&1, :int), [
-      &decode(&1, :short), # updated cluster id
-      &decode(&1, :long), # updated cluster position
-      &decode(&1, :int), # new record version
+    updated_parser = GP.array_parser(dec_fn(:int), [
+      dec_fn(:short), # updated cluster id
+      dec_fn(:long), # updated cluster position
+      dec_fn(:int), # new record version
     ])
 
     parsers = [created_parser, updated_parser, &parse_collection_changes/1]
@@ -234,9 +233,9 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_resp_to_record_load(<<1, rest :: binary>>, acc, schema) do
     parsers = [
-      &decode(&1, :byte),  # type
-      &decode(&1, :int),   # version
-      &decode(&1, :bytes), # contents
+      dec_fn(:byte),  # type
+      dec_fn(:int),   # version
+      dec_fn(:bytes), # contents
     ]
 
     case GP.parse(rest, parsers) do
@@ -277,7 +276,7 @@ defmodule MarcoPolo.Protocol do
   @serialized_result ?a
 
   defp parse_resp_to_command(<<type, data :: binary>>, schema) when type in [@list, @set] do
-    parser = GP.array_parser(&decode(&1, :int), &parse_record_with_rid(&1, schema))
+    parser = GP.array_parser(dec_fn(:int), &parse_record_with_rid(&1, schema))
 
     case GP.parse(data, parser) do
       {records, rest} ->
@@ -297,7 +296,7 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_resp_to_command(<<@serialized_result, rest :: binary>>, schema) do
-    case GP.parse(rest, &decode(&1, :bytes)) do
+    case GP.parse(rest, dec_fn(:bytes)) do
       {binary, rest} ->
         parse_linked_records(CSVTypes.decode(binary), rest, schema)
       :incomplete ->
@@ -320,11 +319,11 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_record_with_rid(<<0 :: short, rest :: binary>>, schema) do
     parsers = [
-      &decode(&1, :byte),
-      &decode(&1, :short),
-      &decode(&1, :long),
-      &decode(&1, :int),
-      &decode(&1, :bytes)
+      dec_fn(:byte),
+      dec_fn(:short),
+      dec_fn(:long),
+      dec_fn(:int),
+      dec_fn(:bytes)
     ]
 
     case GP.parse(rest, parsers) do
@@ -349,7 +348,7 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_record_with_rid(<<-3 :: short, rest :: binary>>, _schema) do
-    GP.parse(rest, [&decode(&1, :short), &decode(&1, :long)])
+    GP.parse(rest, [dec_fn(:short), dec_fn(:long)])
   end
 
   defp parse_record_with_rid(_, _schema) do
@@ -358,14 +357,14 @@ defmodule MarcoPolo.Protocol do
 
   defp parse_collection_changes(data) do
     array_elem_parsers = [
-      &decode(&1, :long),
-      &decode(&1, :long),
-      &decode(&1, :long),
-      &decode(&1, :long),
-      &decode(&1, :int),
+      dec_fn(:long),
+      dec_fn(:long),
+      dec_fn(:long),
+      dec_fn(:long),
+      dec_fn(:int),
     ]
 
-    GP.parse(data, GP.array_parser(&decode(&1, :int), array_elem_parsers))
+    GP.parse(data, GP.array_parser(dec_fn(:int), array_elem_parsers))
   end
 
   defp build_resp_to_tx_commit(created, updated) do
@@ -438,9 +437,9 @@ defmodule MarcoPolo.Protocol do
 
   defp do_parse_push_data(data, schema) do
     parsers = [
-      &decode(&1, :int), # in Java this is Integer.MIN_VALUE, wat
-      &decode(&1, :byte), # the byte for REQUEST_PUSH_LIVE_QUERY
-      &decode(&1, :bytes), # the list of changes
+      dec_fn(:int), # in Java this is Integer.MIN_VALUE, wat
+      dec_fn(:byte), # the byte for REQUEST_PUSH_LIVE_QUERY
+      dec_fn(:bytes), # the list of changes
     ]
 
     case GP.parse(data, parsers) do
@@ -478,6 +477,10 @@ defmodule MarcoPolo.Protocol do
 
   defp decode_record_by_type(@binary_record, content, _schema) do
     %BinaryRecord{contents: content}
+  end
+
+  defp dec_fn(type) do
+    &decode(&1, type)
   end
 
   defp req_code(:shutdown),                          do: 1
