@@ -1,6 +1,11 @@
 # Changelog
 
-## v0.2.0-dev
+## v0.2.1
+
+* Fixed a nasty bug in the serialized record parser. It should all be
+  transparent to the users.
+
+## v0.2.0
 
 #### Features and improvements
 
