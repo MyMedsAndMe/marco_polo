@@ -1,18 +1,49 @@
 defmodule MarcoPolo.Protocol.RecordSerialization do
   @moduledoc false
 
-  # This module implements the serialization/deserilization protocol described
+  # This module implements the serialization/deserialization protocol described
   # here:
   # http://orientdb.com/docs/last/Record-Schemaless-Binary-Serialization.html. It's
   # a little bit of a mess.
 
+  require Record
+  Record.defrecordp :field, [:name, :ptr, :type]
+  @typep field :: {:field, binary, integer, atom}
+
+  @typep schema :: HashDict.t | %{}
+
+  defmodule State do
+    @type t :: %__MODULE__{whole_data: binary, schema: HashDict.t | %{}}
+    defstruct schema: %{}, whole_data: nil
+  end
+
   alias MarcoPolo.Document
   alias MarcoPolo.RID
+  alias MarcoPolo.Protocol.Utils
 
   import MarcoPolo.Protocol.Protobuf
 
-  require Record
-  Record.defrecordp :field, [:name, :ptr, :type]
+  @simple_types ~w(boolean
+                   short
+                   int
+                   long
+                   float
+                   double
+                   string
+                   binary
+                   date
+                   datetime
+                   decimal
+                   link
+                   link_list
+                   link_set
+                   link_map
+                   link_bag)a
+
+  @embedded_types ~w(embedded
+                     embedded_list
+                     embedded_set
+                     embedded_map)a
 
   @doc """
   Decodes a binary-serialized record into a `MarcoPolo.Record` struct.
@@ -30,12 +61,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   """
   @spec decode(binary, Dict.t) :: Document.t | :unknown_property_id
   def decode(data, schema \\ %{}) do
+    state = %State{whole_data: data, schema: schema}
+
     <<_serialization_version, rest :: binary>> = data
 
     # OrientDB sometimes sends stuff after a record that they use to keep track
     # of updates and other things. Let's ignore this stuff and hope everything
     # goes fine, shall we?
-    case decode_embedded(rest, schema, data) do
+    case decode_embedded(rest, state) do
       {record, _cruft} ->
         record
       :unknown_property_id ->
@@ -64,21 +97,15 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # Decodes a document (ODocument). This ODocument can be a "top-level" document
   # or an "embedded" type, since the leading serialization version byte is not
   # decoded here (but in `decode/2`).
-  defp decode_embedded(data, schema, original_data \\ nil) do
-    original_data = original_data || data
+  defp decode_embedded(data, %State{} = state) do
     {class_name, rest} = decode_type(data, :string)
+    class_name = nullify_empty_string(class_name)
 
-    case decode_header(rest, schema) do
-      {field_definitions, _} ->
-        # We're passing the whole `original_data` to the `decode_fields/3`
-        # function because pointers to data will be used to retrieve the values
-        # of the fields.
-        {fields, rest} = decode_fields(original_data, field_definitions, schema)
-
-        if class_name == "" do
-          class_name = nil
-        end
-
+    case decode_header(rest, state) do
+      {[], rest} ->
+        {%Document{class: class_name, fields: %{}}, rest}
+      {field_definitions, _rest} ->
+        {fields, rest} = decode_fields(field_definitions, state)
         {%Document{class: class_name, fields: fields}, rest}
       :unknown_property_id ->
         :unknown_property_id
@@ -89,7 +116,8 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   # "pointers" to the corresponding data in the rest of the binary. Returns a
   # tuple with a list of fields as the first element and the non-header data as
   # the second element.
-  defp decode_header(data, schema, acc \\ []) do
+  @spec decode_header(binary, State.t, [field]) :: [field]
+  defp decode_header(data, %State{} = state, acc \\ []) do
     # If `i` is positive, that means the next field definition is a "named
     # field" and `i` is the length of the field's name. If it's negative, it
     # represents the property id of a property. If it's 0, it signals the end of
@@ -98,16 +126,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
       {0, rest} ->
         {Enum.reverse(acc), rest}
       {i, rest} when i < 0 ->
-        case decode_property_definition(rest, i, schema) do
-          {field, rest}        -> decode_header(rest, schema, [field|acc])
+        case decode_property_definition(rest, i, state.schema) do
+          {field, rest}        -> decode_header(rest, state, [field|acc])
           :unknown_property_id -> :unknown_property_id
         end
       {i, _} when i > 0 ->
         {field, rest} = decode_field_definition(data)
-        decode_header(rest, schema, [field|acc])
+        decode_header(rest, state, [field|acc])
     end
   end
 
+  @spec decode_property_definition(binary, integer, schema) :: {field, binary} | :unknown_property_id
   defp decode_property_definition(data, encoded_id, schema) do
     # That's how you decode property ids.
     id = - encoded_id - 1
@@ -122,7 +151,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  # Decodes the definition of a named field in the header (`data`).
+  @spec decode_field_definition(binary) :: {field, binary}
   defp decode_field_definition(data) do
     {name, rest}             = decode_type(data, :string)
     {ptr, rest}              = decode_data_ptr(rest)
@@ -131,34 +160,22 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {field(name: name, type: int_to_type(type), ptr: ptr), rest}
   end
 
-  # Here, `data` is the whole data of the embedded record because we use
-  # pointers to get to the field values.
-  defp decode_fields(data, field_definitions, schema) do
-    fields = Enum.map(field_definitions, &decode_field(data, &1, schema))
-
-    rest =
-      case List.last(fields) do
-        {_, rest} -> rest
-        _         -> data
-      end
-
-    fields =
-      fields
-      |> Enum.map(fn {name_and_value, _rest} -> name_and_value end)
-      |> Enum.into(%{})
-
-    {fields, rest}
+  @spec decode_fields([field], State.t) :: {%{}, binary}
+  defp decode_fields(field_definitions, %State{} = state) when is_list(field_definitions) do
+    fields = Enum.map(field_definitions, &decode_field(&1, state))
+    {fields_to_map(fields), get_rest_from_list_of_fields(fields)}
   end
+
+  @spec decode_field(field, State.t) :: {{binary, term}, binary}
+  defp decode_field(field, state)
 
   # A 0 pointer means the field is null.
-  defp decode_field(data, field(name: name, ptr: 0), _schema) do
-    {{name, nil}, data}
+  defp decode_field(field(name: name, ptr: 0), %State{}) do
+    {{name, nil}, <<>>}
   end
 
-  defp decode_field(data, field(name: name, type: type, ptr: ptr), schema) do
-    pointed_data = from_pointer_to_end(data, ptr)
-    {value, rest} = decode_type(pointed_data, type, schema, data)
-
+  defp decode_field(field(name: name, type: type, ptr: ptr), %State{} = state) do
+    {value, rest} = decode_type(pointed_data(state.whole_data, ptr), type, state)
     {{name, value}, rest}
   end
 
@@ -168,117 +185,70 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {data_ptr, rest}
   end
 
-  # Decodes an instance of `type` from `data`.
   # Made public for testing.
   @doc false
-  def decode_type(data, type, schema \\ HashDict.new, original_data \\ nil)
-
-  def decode_type(<<0>> <> rest, :boolean, _, _), do: {false, rest}
-  def decode_type(<<1>> <> rest, :boolean, _, _), do: {true, rest}
-
-  def decode_type(data, type, _, _) when type in [:short, :int, :long] do
-    decode_zigzag_varint(data)
+  @spec decode_type(binary, atom) :: {term, binary}
+  def decode_type(pointed_data, type) when type in @simple_types do
+    decode_simple_type(pointed_data, type)
   end
 
-  def decode_type(data, :float, _, _) do
-    <<float :: 32-float, rest :: binary>> = data
+  # Made public for testing.
+  @doc false
+  @spec decode_type(binary, atom, State.t) :: {term, binary}
+  def decode_type(pointed_data, type, _state) when type in @simple_types,
+    do: decode_simple_type(pointed_data, type)
+  def decode_type(pointed_data, type, state) when type in @embedded_types,
+    do: decode_embedded_type(pointed_data, type, state)
+
+  @spec decode_simple_type(binary, atom) :: {term, binary}
+  defp decode_simple_type(pointed_data, type)
+
+  defp decode_simple_type(<<0>> <> rest, :boolean), do: {false, rest}
+  defp decode_simple_type(<<1>> <> rest, :boolean), do: {true, rest}
+
+  defp decode_simple_type(pointed_data, type) when type in [:short, :int, :long] do
+    decode_zigzag_varint(pointed_data)
+  end
+
+  defp decode_simple_type(pointed_data, :float) do
+    <<float :: 32-float, rest :: binary>> = pointed_data
     {float, rest}
   end
 
-  def decode_type(data, :double, _, _) do
-    <<double :: 64-float, rest :: binary>> = data
+  defp decode_simple_type(pointed_data, :double) do
+    <<double :: 64-float, rest :: binary>> = pointed_data
     {double, rest}
   end
 
-  def decode_type(data, type, _, _) when type in [:string, :binary] do
-    {len, rest} = decode_zigzag_varint(data)
-    <<string :: bytes-size(len), rest :: binary>> = rest
-    {string, rest}
+  # Strings and binaries are encoded/decoded in the exact same way.
+  defp decode_simple_type(pointed_data, type) when type in [:string, :binary] do
+    {len, rest} = decode_zigzag_varint(pointed_data)
+    <<str :: bytes-size(len), rest :: binary>> = rest
+    {str, rest}
   end
 
-  def decode_type(data, :date, _, _) do
-    {days, rest} = decode_zigzag_varint(data)
+  defp decode_simple_type(pointed_data, :date) do
+    {days, rest} = decode_zigzag_varint(pointed_data)
     days = :calendar.date_to_gregorian_days(1970, 1, 1) + days
     {y, m, d} = :calendar.gregorian_days_to_date(days)
     {%MarcoPolo.Date{year: y, month: m, day: d}, rest}
   end
 
-  def decode_type(data, :datetime, _, _) do
-    {msecs_from_epoch, rest} = decode_type(data, :long)
+  defp decode_simple_type(pointed_data, :datetime) do
+    {msecs_from_epoch, rest} = decode_simple_type(pointed_data, :long)
     secs_from_epoch = div(msecs_from_epoch, 1000)
     msec = rem(msecs_from_epoch, 1000)
     epoch = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
 
     total_secs = epoch + secs_from_epoch
     {{year, month, day}, {hour, min, sec}} = :calendar.gregorian_seconds_to_datetime(total_secs)
-    datetime = %MarcoPolo.DateTime{year: year, month: month, day: day,
-                                   hour: hour, min: min, sec: sec, msec: msec}
 
-    {datetime, rest}
+    {%MarcoPolo.DateTime{year: year, month: month, day: day,
+                         hour: hour, min: min, sec: sec, msec: msec},
+     rest}
   end
 
-  def decode_type(data, :embedded, schema, _) do
-    decode_embedded(data, schema)
-  end
-
-  def decode_type(data, :embedded_list, schema, _) do
-    {nitems, rest}           = decode_zigzag_varint(data)
-    <<type, rest :: binary>> = rest
-
-    # Only ANY is supported by OrientDB at the moment.
-    :any = int_to_type(type)
-
-    Enum.map_reduce List.duplicate(nil, nitems), rest, fn(_, <<type, acc :: binary>>) ->
-      decode_type(acc, int_to_type(type), schema)
-    end
-  end
-
-  def decode_type(data, :embedded_set, schema, _) do
-    {elems, rest} = decode_type(data, :embedded_list, schema)
-    {Enum.into(elems, HashSet.new), rest}
-  end
-
-  def decode_type(data, :embedded_map, schema, original_data) do
-    {keys, _rest} = decode_map_header(data)
-    decode_map_values(original_data, keys, schema)
-  end
-
-  def decode_type(data, :link, _, _) do
-    {cluster_id, rest} = decode_zigzag_varint(data)
-    {position, rest} = decode_zigzag_varint(rest)
-
-    {%RID{cluster_id: cluster_id, position: position}, rest}
-  end
-
-  def decode_type(data, :link_list, _, _) do
-    {nelems, rest} = decode_zigzag_varint(data)
-    {elems, rest} = Enum.map_reduce List.duplicate(nil, nelems), rest, fn(_, acc) ->
-      decode_type(acc, :link)
-    end
-
-    {{:link_list, elems}, rest}
-  end
-
-  def decode_type(data, :link_set, _, _) do
-    {{:link_list, elems}, rest} = decode_type(data, :link_list)
-    {{:link_set, Enum.into(elems, HashSet.new)}, rest}
-  end
-
-  def decode_type(data, :link_map, _, _) do
-    {nkeys, rest} = decode_zigzag_varint(data)
-    {pairs, rest} = Enum.map_reduce List.duplicate(0, nkeys), rest, fn(_, <<type, acc :: binary>>) ->
-      # Only string keys are supported
-      :string = int_to_type(type)
-
-      {key, acc} = decode_type(acc, :string)
-      {rid, acc} = decode_type(acc, :link)
-      {{key, rid}, acc}
-    end
-
-    {{:link_map, Enum.into(pairs, %{})}, rest}
-  end
-
-  def decode_type(data, :decimal, _, _) do
+  defp decode_simple_type(data, :decimal) do
     <<scale :: 32, value_size :: 32, rest :: binary>>         = data
     <<value :: big-size(value_size)-unit(8), rest :: binary>> = rest
 
@@ -286,17 +256,48 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {Decimal.new(value), rest}
   end
 
+  defp decode_simple_type(data, :link) do
+    {cluster_id, rest} = decode_zigzag_varint(data)
+    {position, rest} = decode_zigzag_varint(rest)
+    {%RID{cluster_id: cluster_id, position: position}, rest}
+  end
+
+  defp decode_simple_type(data, :link_list) do
+    {nelems, rest} = decode_zigzag_varint(data)
+    {elems, rest} = Utils.reduce_n_times(nelems, rest, &decode_simple_type(&1, :link))
+    {{:link_list, elems}, rest}
+  end
+
+  defp decode_simple_type(data, :link_set) do
+    {{:link_list, elems}, rest} = decode_simple_type(data, :link_list)
+    {{:link_set, Enum.into(elems, HashSet.new)}, rest}
+  end
+
+  defp decode_simple_type(data, :link_map) do
+    {nkeys, rest} = decode_zigzag_varint(data)
+    {pairs, rest} = Utils.reduce_n_times nkeys, rest, fn(<<type>> <> acc) ->
+      # Only string keys are supported
+      :string = int_to_type(type)
+
+      {key, acc} = decode_simple_type(acc, :string)
+      {rid, acc} = decode_simple_type(acc, :link)
+      {{key, rid}, acc}
+    end
+
+    {{:link_map, Enum.into(pairs, %{})}, rest}
+  end
+
   # 1 means "embedded" RidBag.
-  def decode_type(<<1, size :: 32, rest :: binary>>, :link_bag, _, _) do
-    {rids, rest} = Enum.map_reduce List.duplicate(0, size), rest, fn(_, acc) ->
-      <<cluster_id :: 16, position :: 64, acc :: binary>> = acc
+  defp decode_simple_type(<<1, size :: 32, rest :: binary>>, :link_bag) do
+    {rids, rest} = Utils.reduce_n_times size, rest, fn(acc) ->
+      <<cluster_id :: 16, position :: 64>> <> acc = acc
       {%RID{cluster_id: cluster_id, position: position}, acc}
     end
 
     {{:link_bag, rids}, rest}
   end
 
-  def decode_type(<<0, _ :: binary>>, :link_bag, _, _) do
+  defp decode_simple_type(<<0, _ :: binary>>, :link_bag) do
     raise MarcoPolo.Error, """
     Tree-based RidBags are not supported by MarcoPolo (yet); only embedded
     RidBags are. You can change your OrientDB server configuration to force
@@ -317,14 +318,49 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     """
   end
 
-  defp decode_map_header(data) do
+  @spec decode_embedded_type(binary, atom, State.t) :: {term, binary}
+  defp decode_embedded_type(pointed_data, type, state)
+
+  defp decode_embedded_type(pointed_data, :embedded, %State{} = state) do
+    decode_embedded(pointed_data, state)
+  end
+
+  defp decode_embedded_type(pointed_data, :embedded_list, %State{} = state) do
+    {nitems, rest}           = decode_zigzag_varint(pointed_data)
+    <<type, rest :: binary>> = rest
+
+    # Only ANY is supported by OrientDB at the moment.
+    :any = int_to_type(type)
+
+    Utils.reduce_n_times nitems, rest, fn(<<type>> <> acc) ->
+      decode_type(acc, int_to_type(type), state)
+    end
+  end
+
+  defp decode_embedded_type(pointed_data, :embedded_set, %State{} = state) do
+    {elems, rest} = decode_embedded_type(pointed_data, :embedded_list, state)
+    {Enum.into(elems, HashSet.new), rest}
+  end
+
+  defp decode_embedded_type(pointed_data, :embedded_map, %State{} = state) do
+    decode_embedded_map(pointed_data, state)
+  end
+
+  defp decode_embedded_map(pointed_data, state) do
+    case decode_map_keys(pointed_data) do
+      {[], rest}    -> {%{}, rest}
+      {keys, _rest} -> decode_map_values(keys, state)
+    end
+  end
+
+  defp decode_map_keys(data) do
     {nkeys, rest} = decode_zigzag_varint(data)
 
-    Enum.map_reduce List.duplicate(nil, nkeys), rest, fn(_, <<string_type, acc :: binary>>) ->
+    Utils.reduce_n_times nkeys, rest, fn(<<type>> <> acc) ->
       # For now, OrientDB only supports STRING keys.
-      :string = int_to_type(string_type)
+      :string = int_to_type(type)
 
-      {key, acc} = decode_type(acc, :string)
+      {key, acc} = decode_simple_type(acc, :string)
       {ptr, acc} = decode_data_ptr(acc)
       <<type, acc :: binary>> = acc
 
@@ -332,20 +368,10 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     end
   end
 
-  defp decode_map_values(data, keys, schema) do
-    values = Enum.map(keys, &decode_field(data, &1, schema))
-
-    rest =
-      case List.last(values) do
-        {_, rest} -> rest
-        _         -> data
-      end
-
-    values =
-      values
-      |> Enum.map(fn {name_and_value, _rest} -> name_and_value end)
-      |> Enum.into(%{})
-
+  defp decode_map_values(keys, %State{} = state) do
+    values = Enum.map(keys, &decode_field(&1, state))
+    rest = get_rest_from_list_of_fields(values)
+    values = fields_to_map(values)
     {values, rest}
   end
 
@@ -533,8 +559,26 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     byte_size(nkeys) + Enum.sum(key_lengths)
   end
 
-  defp from_pointer_to_end(data, position) when position > 0 do
-    binary_part(data, position, byte_size(data) - position)
+  defp pointed_data(data, position) when position > 0 and byte_size(data) > position,
+    do: binary_part(data, position, byte_size(data) - position)
+  defp pointed_data(data, pos),
+    do: raise(ArgumentError, "position #{pos} is outside of the given binary (which is #{byte_size(data)} bytes long)")
+
+  defp nullify_empty_string(""), do: nil
+  defp nullify_empty_string(str) when is_binary(str), do: str
+
+  defp get_rest_from_list_of_fields([_|_] = fields) do
+    fields
+    |> Enum.reverse()
+    |> Enum.drop_while(fn {{_name, val}, _rest} -> is_nil(val) end)
+    |> List.first()
+    |> elem(1)
+  end
+
+  defp fields_to_map(fields) do
+    for {name_and_value, _rest} <- fields, into: %{} do
+      name_and_value
+    end
   end
 
   defp infer_type(%HashSet{}),               do: :embedded_set

@@ -5,9 +5,10 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   alias MarcoPolo.Document
   alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
+  alias MarcoPolo.Protocol.RecordSerialization.State
 
   import MarcoPolo.Protocol.Protobuf
-  import Ser, only: [encode_value: 1, decode_type: 2, decode_type: 4]
+  import Ser, only: [encode_value: 1, decode_type: 2, decode_type: 3]
 
   @record_no_fields <<0,           # version
                       10, "Klass", # class name
@@ -117,18 +118,31 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "decode/2: record with a map in it" do
     record = <<0, # serialization version
-             20, "Schemaless", # class
-             2, "m", 0, 0, 0, 20, 12, # "m" field at byte 20 with type 12 (EMBEDDEDMAP)
-             0, # end of header
-             # Map:
-               2, # number of keys (zigzag so 1)
-               7, # key type (STRING)
-               2, "a", # key name
-               0, 0, 0, 29, # key pointer
-               1, 2, # key type (1 = INT) and value
-             >>
+               20, "Schemaless", # class
+               2, "m", 0, 0, 0, 20, 12, # "m" field at byte 20 with type 12 (EMBEDDEDMAP)
+               0, # end of header
+               # Map:
+                 2, # number of keys (zigzag so 1)
+                 7, # key type (STRING)
+                 2, "a", # key name
+                 0, 0, 0, 29, # key pointer
+                 1, 2, # key type (1 = INT) and value
+               >>
 
     assert Ser.decode(record) == %Document{class: "Schemaless", fields: %{"m" => %{"a" => 1}}}
+  end
+
+  test "decode/2: record with null fields" do
+    record = <<0,                            # serialization version
+               10, "Class",                  # class
+               12, "nonull", 0, 0, 0, 30, 7, # "nonull" field of type string
+               8, "null", 0, 0, 0, 0, 7,     # "null" field of type string (with a null pointer)
+               0,                            # end of header
+               6, "foo",                     # "nonull" field
+               >>
+
+    assert Ser.decode(record)
+           == %Document{class: "Class", fields: %{"nonull" => "foo", "null" => nil}}
   end
 
   test "decode_type/2: simple types" do
@@ -169,17 +183,19 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: embedded documents" do
-    assert decode_type(@embedded_record_with_fields <> "rest", :embedded) ==
-           {%Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
+    data = @embedded_record_with_fields <> "rest"
+    assert decode_type(data, :embedded, %State{whole_data: data})
+           == {%Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
   end
 
   test "decode_type/2: embedded lists" do
-    assert decode_type(@list, :embedded_list) == {["elem", true], "foo"}
+    assert decode_type(@list, :embedded_list, %State{whole_data: @list}) == {["elem", true], "foo"}
   end
 
   test "decode_type/2: embedded sets" do
     expected_set = Enum.into(["elem", true], HashSet.new)
-    assert decode_type(@list, :embedded_set) == {expected_set, "foo"}
+    assert decode_type(@list, :embedded_set, %State{whole_data: @list})
+           == {expected_set, "foo"}
   end
 
   test "decode_type/2: embedded maps with null data" do
@@ -195,23 +211,8 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
              10, "value", # key1 value
              "foo">>
 
-    flunk "this doesn't work yet :("
-
     map = %{"key1" => "value", "key2" => nil}
-    assert decode_type(data, :embedded_map, nil, data) == {map, "foo"}
-  end
-
-  test "decode_type/2: embedded maps" do
-    data = <<2,           # number of keys (zigzag, hence 1)
-             7,           # key type (string)
-             8, "key1",   # key
-             0, 0, 0, 12, # ptr to data
-             7,           # data type (string)
-             10, "value", # key1 value
-             "foo">>
-
-    map = %{"key1" => "value"}
-    assert decode_type(data, :embedded_map, nil, data) == {map, "foo"}
+    assert decode_type(data, :embedded_map, %State{whole_data: data}) == {map, "foo"}
   end
 
   test "decode_type/2: links" do
