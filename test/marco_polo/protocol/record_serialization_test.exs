@@ -7,7 +7,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
 
   import MarcoPolo.Protocol.Protobuf
-  import Ser, only: [encode_value: 1, decode_type: 2]
+  import Ser, only: [encode_value: 1, decode_type: 2, decode_type: 4]
 
   @record_no_fields <<0,           # version
                       10, "Klass", # class name
@@ -22,41 +22,53 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   @record_with_fields <<0,            # version
                         6, "foo",     # class name
                         10, "hello",  # field name
-                        0, 0, 0, 25,  # pointer to data
+                        0, 0, 0, 26,  # pointer to data
                         7,            # field type (string)
                         6, "int",     # field name
-                        0, 0, 0, 32,  # pointer to data
+                        0, 0, 0, 33,  # pointer to data
                         1,            # field type (int)
                         0,            # end of header
                         12, "world!", # field value
                         24,           # field value (int with zigzag)
                         >>
 
-  @record_with_property <<0,
-                          6, "foo",
-                          1, # -1 with zigzag, it's the prop id (0 as a prop id)
-                          0, 0, 0, 25,
-                          0,
-                          10, "value",
+  @embedded_record_with_fields <<6, "foo",     # class name
+                                 10, "hello",  # field name
+                                 0, 0, 0, 25,  # pointer to data
+                                 7,            # field type (string)
+                                 6, "int",     # field name
+                                 0, 0, 0, 32,  # pointer to data
+                                 1,            # field type (int)
+                                 0,            # end of header
+                                 12, "world!", # field value
+                                 24,           # field value (int with zigzag)
+                                 >>
+
+  @record_with_property <<0,           # version
+                          6, "foo",    # class name
+                          1,           # -1 with zigzag, it's the prop id (0 as a prop id)
+                          0, 0, 0, 11, # pointer to data
+                          0,           # end of header
+                          10, "value", # value
                           >>
 
-  @record_with_junk_bytes <<0,
-                          8, "User",
-                          45, 0, 0, 0, 67,
-                          8, "name", 0, 0, 0, 69, 7,
-                          34, "out_FriendRequest", 0, 0, 0, 78, 22,
-                          32, "in_FriendRequest", 0, 0, 0, 103, 22,
-                          0, # end of header
-                          2, 51, # property 45 (a string) = "3"
-                          16, 72, 101, 114, 109, 105, 111, 110, 101, # name = "Hermione"
-                          1, # ridbag...
-                            0, 0, 0, 1, # ...with one element...
-                            0, 13, 0, 0, 0, 0, 0, 0, 0, 1, # ...with this rid
-                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # junk bytes
-                          1, # ridbag...
-                            0, 0, 0, 1, # ...with one element...
-                            0, 13, 0, 0, 0, 0, 0, 0, 0, 3 # ...with this rid
-                          >>
+  @record_with_junk_bytes <<0, # serialization version
+                          8, "User",                                 # class name
+                          45, 0, 0, 0, 67,                           # property field
+                          8, "name", 0, 0, 0, 69, 7,                 # named field (STRING)
+                          34, "out_FriendRequest", 0, 0, 0, 78, 22,  # named field (LINK_BAG)
+                          32, "in_FriendRequest", 0, 0, 0, 103, 22,  # named field (LINK_BAG)
+                          0,                                         # end of header
+                          2, 51,                                     # property 45 (a string) = "3"
+                          16, 72, 101, 114, 109, 105, 111, 110, 101, # "name" = "Hermione"
+                          1,                                         # ridbag...
+                            0, 0, 0, 1,                              # ...with one element...
+                            0, 13, 0, 0, 0, 0, 0, 0, 0, 1,           # ...with this rid
+                          <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>,          # 10 junk bytes
+                          1,                                         # ridbag...
+                            0, 0, 0, 1,                              # ...with one element...
+                            0, 13, 0, 0, 0, 0, 0, 0, 0, 3,           # ...with this rid
+                          "rest">>
 
   @list <<4,            # number of items (zigzag, hence 2)
           23,           # type of the elems in the list, OrientDB only supports ANY
@@ -93,17 +105,30 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "decode/2: record with junk bytes in it" do
     # Junk bytes should be ignored because pointers in the headers are used.
-
     schema = %{global_properties: %{22 => {"oauth_id", "STRING"}}}
+    record = %Document{class: "User", fields: %{
+      "oauth_id" => "3",
+      "name" => "Hermione",
+      "out_FriendRequest" => {:link_bag, [%RID{cluster_id: 13, position: 1}]},
+      "in_FriendRequest" => {:link_bag, [%RID{cluster_id: 13, position: 3}]},
+    }}
+    assert Ser.decode(@record_with_junk_bytes, schema) == record
+  end
 
-    assert_raise MarcoPolo.Error, ~r/Tree-based/, fn ->
-      Ser.decode(@record_with_junk_bytes, schema)
-    end
+  test "decode/2: record with a map in it" do
+    record = <<0, # serialization version
+             20, "Schemaless", # class
+             2, "m", 0, 0, 0, 20, 12, # "m" field at byte 20 with type 12 (EMBEDDEDMAP)
+             0, # end of header
+             # Map:
+               2, # number of keys (zigzag so 1)
+               7, # key type (STRING)
+               2, "a", # key name
+               0, 0, 0, 29, # key pointer
+               1, 2, # key type (1 = INT) and value
+             >>
 
-    flunk """
-    This test would pass because I found the right error it should raise. But it
-    shouldn't raise that error in the first place :).
-    """
+    assert Ser.decode(record) == %Document{class: "Schemaless", fields: %{"m" => %{"a" => 1}}}
   end
 
   test "decode_type/2: simple types" do
@@ -144,10 +169,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: embedded documents" do
-    # Embedded documents have no serialization version
-    <<_version, record :: bytes>> = @record_with_fields
-
-    assert decode_type(record <> "rest", :embedded) ==
+    assert decode_type(@embedded_record_with_fields <> "rest", :embedded) ==
            {%Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}, "rest"}
   end
 
@@ -160,21 +182,36 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert decode_type(@list, :embedded_set) == {expected_set, "foo"}
   end
 
-  test "decode_type/2: embedded maps" do
+  test "decode_type/2: embedded maps with null data" do
     data = <<4,           # number of keys (zigzag, hence 2)
              7,           # key type (string)
              8, "key1",   # key
-             0, 0, 0, 14, # ptr to data
+             0, 0, 0, 23, # ptr to data
              7,           # data type (string)
              7,           # key type (string)
              8, "key2",   # key
              0, 0, 0, 0,  # ptr to data, 0 means null data
-             0,           # when ptr is null type is always 0 (which is boolean, but irrelevant)
+             0,           # when ptr is null the type is always 0 (which is boolean, but irrelevant)
              10, "value", # key1 value
              "foo">>
 
+    flunk "this doesn't work yet :("
+
     map = %{"key1" => "value", "key2" => nil}
-    assert decode_type(data, :embedded_map) == {map, "foo"}
+    assert decode_type(data, :embedded_map, nil, data) == {map, "foo"}
+  end
+
+  test "decode_type/2: embedded maps" do
+    data = <<2,           # number of keys (zigzag, hence 1)
+             7,           # key type (string)
+             8, "key1",   # key
+             0, 0, 0, 12, # ptr to data
+             7,           # data type (string)
+             10, "value", # key1 value
+             "foo">>
+
+    map = %{"key1" => "value"}
+    assert decode_type(data, :embedded_map, nil, data) == {map, "foo"}
   end
 
   test "decode_type/2: links" do
@@ -292,10 +329,9 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
     assert bin(encode_value(record)) == record_content
   end
 
-  test "encode_value/1: embedded document with fields" do
+  test "encode/1: document with fields" do
     record = %Document{class: "foo", fields: %{"hello" => "world!", "int" => 12}}
-    <<_version, record_content :: binary>> = @record_with_fields
-    assert bin(encode_value(record)) == record_content
+    assert bin(Ser.encode(record)) == @record_with_fields
   end
 
   test "encode_value/1: embedded document with nil fields" do
