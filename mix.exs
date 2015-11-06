@@ -34,7 +34,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   defp package do
-    [contributors: ["Andrea Leopardi"],
+    [maintainers: ["Andrea Leopardi"],
      licenses: ["Apache"],
      links: %{"GitHub" => "https://github.com/MyMedsAndMe/marco_polo"}]
   end
