@@ -47,7 +47,7 @@ defmodule MarcoPolo.Mixfile do
 
   defp deps do
     [{:decimal, "~> 1.1.0"},
-     {:connection, "1.0.0-rc.1"},
+     {:connection, "~> 1.0.0"},
      {:dialyze, "~> 0.2.0", only: :dev},
      {:coverex, "~> 1.4", only: :test},
      {:dotenv, "~> 1.0", only: :test},
