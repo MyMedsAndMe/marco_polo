@@ -29,7 +29,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger] ++ if(Mix.env == :test, do: [:dotenv], else: []),
+    [applications: [:logger, :connection] ++ if(Mix.env == :test, do: [:dotenv], else: []),
      env: [client_name: @client_name, version: @version]]
   end
 
