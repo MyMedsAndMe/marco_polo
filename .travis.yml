@@ -5,17 +5,16 @@ env:
     - ORIENTDB_USER=root
     - ORIENTDB_PASS=root
   matrix:
-    - ORIENTDB_VERSION="2.0.12"
-    - ORIENTDB_VERSION="2.0.13"
-    - ORIENTDB_VERSION="2.1.0"
-    - ORIENTDB_VERSION="2.1.2"
+    - ORIENTDB_VERSION="2.1.12"
+
 
 elixir:
   - 1.0.5
+  - 1.2.2
 
 otp_release:
   - 17.5
-  - 18.0
+  - 18.2.1
 
 before_install:
   - chmod +x ./ci/ci.sh
