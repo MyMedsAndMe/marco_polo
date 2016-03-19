@@ -106,11 +106,11 @@ defmodule MarcoPoloTest do
     end
 
     test "drop_db/3 with a non-existing database", %{conn: c} do
-      expected = {"com.orientechnologies.orient.core.exception.OStorageException",
-                  "Database with name 'Nonexistent' does not exist"}
+      expected_ex = "com.orientechnologies.orient.core.exception.OStorageException"
 
       assert {:error, %MarcoPolo.Error{} = err} = MarcoPolo.drop_db(c, "Nonexistent", :plocal)
-      assert hd(err.errors) == expected
+      assert [{^expected_ex, msg}] = err.errors
+      assert msg =~ "Database with name 'Nonexistent' does not exist"
     end
   end
 
