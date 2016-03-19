@@ -20,6 +20,8 @@ defmodule MarcoPolo.Connection do
   @initial_state %{
     # The TCP socket to the OrientDB server
     socket: nil,
+    # The module used to connect to the server (:gen_tcp or :ssl)
+    socket_module: nil,
     # The session id for the session held by this genserver
     session_id: nil,
     # The queue of commands sent to the server
@@ -116,21 +118,20 @@ defmodule MarcoPolo.Connection do
   @doc false
   def init(opts) do
     s = Dict.merge(@initial_state, opts: opts)
+    s = %{s | socket_module: (if opts[:ssl], do: :ssl, else: :gen_tcp)}
     {:connect, :init, s}
   end
 
   @doc false
-  def connect(_info, s) do
-    {host, port, socket_opts, timeout} = tcp_connection_opts(s)
-
-    case :gen_tcp.connect(host, port, socket_opts, timeout) do
+  def connect(_info, %{opts: opts} = s) do
+    case connect_over_socket(s) do
       {:ok, socket} ->
         s = %{s | socket: socket}
-        setup_socket_buffers(socket)
+        setup_socket_buffers(s)
 
         case Auth.connect(s) do
           {:ok, s} ->
-            :inet.setopts(socket, active: :once)
+            inet_module(s).setopts(socket, active: :once)
             {:ok, s}
           {:error, error, s} ->
             {:stop, error, s}
@@ -138,7 +139,8 @@ defmodule MarcoPolo.Connection do
             {:stop, reason, s}
         end
       {:error, reason} ->
-        Logger.error "OrientDB TCP connect error (#{host}:#{port}): #{:inet.format_error(reason)}"
+        Logger.error ["OrientDB connect error (#{opts[:host]}:#{opts[:port]}): ",
+                      inet_module(s).format_error(reason)]
         {:stop, reason, s}
     end
   end
@@ -225,8 +227,9 @@ defmodule MarcoPolo.Connection do
   @doc false
   def handle_info(msg, s)
 
-  def handle_info({:tcp, socket, msg}, %{socket: socket} = s) do
-    :inet.setopts(socket, active: :once)
+  def handle_info({type, socket, msg}, %{socket: socket} = s)
+  when type in [:tcp, :ssl] do
+    inet_module(s).setopts(socket, active: :once)
     data = s.tail <> msg
 
     s =
@@ -239,19 +242,31 @@ defmodule MarcoPolo.Connection do
     {:noreply, s}
   end
 
-  def handle_info({:tcp_closed, socket}, %{socket: socket} = s) do
+  def handle_info({type, socket}, %{socket: socket} = s)
+  when type in [:tcp_closed, :ssl_closed] do
     {:disconnect, {:error, :closed}, s}
   end
 
-  def handle_info({:tcp_error, socket, reason}, %{socket: socket} = s) do
+  def handle_info({type, socket, reason}, %{socket: socket} = s)
+  when type in [:tcp_error, :ssl_error] do
     {:disconnect, {:error, reason}, s}
   end
 
   # Helper functions.
 
-  defp tcp_connection_opts(%{opts: opts} = _state) do
+  defp connect_over_socket(%{opts: opts} = s) do
     socket_opts = @socket_opts ++ (opts[:socket_opts] || [])
-    {to_char_list(opts[:host]), opts[:port], socket_opts, opts[:timeout] || @timeout}
+    connection_opts =
+      if opts[:ssl] do
+        socket_opts ++ (opts[:ssl_opts] || [])
+      else
+        socket_opts
+      end
+
+    s.socket_module.connect(to_char_list(opts[:host]),
+                            opts[:port],
+                            connection_opts,
+                            opts[:timeout] || @timeout)
   end
 
   defp parse_schema(%Document{fields: %{"globalProperties" => properties}}) do
@@ -264,16 +279,17 @@ defmodule MarcoPolo.Connection do
     %{global_properties: global_properties}
   end
 
-  defp setup_socket_buffers(socket) do
-    {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
-      :inet.getopts(socket, [:sndbuf, :recbuf, :buffer])
-
-    buffer = buffer |> max(sndbuf) |> max(recbuf)
-    :ok = :inet.setopts(socket, [buffer: buffer])
+  defp setup_socket_buffers(%{socket: socket} = s) do
+    {:ok, info} = inet_module(s).getopts(socket, [:sndbuf, :recbuf, :buffer])
+    buffer = info[:buffer] |> max(info[:sndbuf]) |> max(info[:recbuf])
+    :ok = inet_module(s).setopts(socket, [buffer: buffer])
   end
 
+  defp inet_module(%{socket_module: :gen_tcp}), do: :inet
+  defp inet_module(%{socket_module: :ssl}),     do: :ssl
+
   defp send_noreply(%{socket: socket} = s, req) do
-    case :gen_tcp.send(socket, req) do
+    case s.socket_module.send(socket, req) do
       :ok                       -> {:noreply, s}
       {:error, _reason} = error -> {:disconnect, error, s}
     end

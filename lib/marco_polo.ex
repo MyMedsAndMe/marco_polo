@@ -42,6 +42,7 @@ defmodule MarcoPolo do
   @default_opts [
     host: "localhost",
     port: 2424,
+    ssl: false,
   ]
 
   @default_fetch_plan ""
@@ -83,6 +84,10 @@ defmodule MarcoPolo do
       running. Defaults to `"localhost"`.
     * `:port` - (integer) the port where the OrientDB server is running.
       Defaults to `2424`.
+    * `:socket_opts` - (list) options to use when opening the TCP/SSL socket.
+    * `:ssl` - (boolean) whether to use SSL to connect to the OrientDB
+      server. Defaults to `false`.
+    * `:ssl_opts` - (list) SSL options (see the `:ssl` module for reference).
 
   It also accepts all options that `GenServer.start_link/3` accepts (e.g.,
   `:name` for registering the new process or `:timeout` for providing a

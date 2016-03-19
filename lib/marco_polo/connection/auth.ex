@@ -31,7 +31,7 @@ defmodule MarcoPolo.Connection.Auth do
   # Waits for the 2 byte protocol version, checks that the protocol is supported
   # and stores it in the state.
   defp negotiate_protocol(%{socket: socket, opts: opts} = s) do
-    case :gen_tcp.recv(socket, 2, opts[:timeout] || @timeout) do
+    case s.socket_module.recv(socket, 2, opts[:timeout] || @timeout) do
       {:ok, <<version :: short>>} ->
         check_min_protocol!(version)
         {:ok, %{s | protocol_version: version}}
@@ -46,7 +46,7 @@ defmodule MarcoPolo.Connection.Auth do
     {op, args} = op_and_connection_args(s)
     req = Protocol.encode_op(op, args)
 
-    case :gen_tcp.send(socket, req) do
+    case s.socket_module.send(socket, req) do
       :ok ->
         wait_for_connection_response(s, op)
       {:error, reason} ->
@@ -83,7 +83,7 @@ defmodule MarcoPolo.Connection.Auth do
     do: raise(ArgumentError, "invalid connection type, valid ones are :server or {:db, name}")
 
   defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
-    case :gen_tcp.recv(socket, 0, opts[:timeout] || @timeout) do
+    case s.socket_module.recv(socket, 0, opts[:timeout] || @timeout) do
       {:error, reason} ->
         {:tcp_error, reason, s}
       {:ok, new_data} ->
