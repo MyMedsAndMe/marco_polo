@@ -1,4 +1,4 @@
-supported_versions = ~w(2.1.12)
+supported_versions = ~w(2.2.0-beta)
 
 excluded_versions =
   case System.get_env("ORIENTDB_VERSION") do
