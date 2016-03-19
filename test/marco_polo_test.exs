@@ -270,12 +270,12 @@ defmodule MarcoPoloTest do
     test "command/3: miscellaneous commands", %{conn: c} do
       import MarcoPolo, only: [command: 2, command: 3]
 
-      assert {:ok, %{}} = command(c, "CREATE CLUSTER misc_tests")
-      assert {:ok, %{}} = command(c, "CREATE CLASS MiscTests CLUSTER misc_tests")
+      assert {:ok, %{}} = command(c, "CREATE CLUSTER misc_tests ID 1234")
+      assert {:ok, %{}} = command(c, "CREATE CLASS MiscTests CLUSTER 1234")
       assert {:ok, %{}} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
       assert {:ok, %{response: nil}} = command(c, "DROP PROPERTY MiscTests.foo")
       assert {:ok, %{response: true}} = command(c, "DROP CLASS MiscTests")
-      assert {:ok, %{response: true}} = command(c, "DROP CLUSTER misc_tests")
+      assert {:ok, %{response: false}} = command(c, "DROP CLUSTER misc_tests")
       assert {:ok, %{response: false}} = command(c, "DROP CLUSTER misc_tests")
     end
 
