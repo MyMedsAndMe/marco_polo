@@ -37,13 +37,6 @@ work properly. For example, the OrientDB user and password used to connect to
 the server are read from the `$ORIENTDB_USER` and `$ORIENTDB_PASS` environment
 variables.
 
-To make working with environment variables easier, MarcoPolo uses
-[dotenv for Elixir][dotenv_elixir], a library that picks up environment
-variables from a `.env` file in the root of the project. This library is only
-used in the `test` Mix environment. You can copy [`.env.example`](.env.example)
-to `.env` (which is not version-controlled) and mofify the values of the
-variables in it.
-
 ### Scripting
 
 OrientDB does not allow server-side scripting by default, so scripring related
@@ -53,6 +46,3 @@ the OrienDB server's XML configuration, you can include the `:scripting` tag
 when running `mix test`:
 
     $ mix test --include scripting
-
-
-[dotenv_elixir]: https://github.com/avdi/dotenv_elixir
