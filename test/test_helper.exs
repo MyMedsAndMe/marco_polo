@@ -18,20 +18,18 @@ ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ excludes)
 ExUnit.start()
 
 unless :integration in ExUnit.configuration[:exclude] do
-  unless System.get_env("ORIENTDB_USER") do
+  user = System.get_env("ORIENTDB_USER") ||
     Mix.raise """
     The $ORIENTDB_USER variable is empty, but it needs to be set to an
     OrientDB admin username in order to run MarcoPolo tests.
     """
-  end
 
-  unless System.get_env("ORIENTDB_PASS") do
+  pass = System.get_env("ORIENTDB_PASS") ||
     Mix.raise """
     The $ORIENTDB_PASS variable is empty, but it needs to be set to the
     password for the user specified in the $ORIENTDB_USER variable in order to
     run MarcoPolo tests.
     """
-  end
 
   case :gen_tcp.connect('localhost', 2424, []) do
     {:ok, _} ->
@@ -72,7 +70,7 @@ unless :integration in ExUnit.configuration[:exclude] do
 
   insert_record = fn(name, insert_cmd) ->
     output = run_script.("""
-    CONNECT remote:localhost/MarcoPoloTest admin admin;
+    CONNECT remote:localhost/MarcoPoloTest #{user} #{pass};
     #{insert_cmd}
     """)
 
@@ -81,26 +79,26 @@ unless :integration in ExUnit.configuration[:exclude] do
 
   run_script.("""
   SET ignoreErrors true;
-  DROP DATABASE remote:localhost/MarcoPoloTest root root;
-  DROP DATABASE remote:localhost/MarcoPoloTestGenerated root root;
-  DROP DATABASE remote:localhost/MarcoPoloToDrop root root;
+  DROP DATABASE remote:localhost/MarcoPoloTest #{user} #{pass};
+  DROP DATABASE remote:localhost/MarcoPoloTestGenerated #{user} #{pass};
+  DROP DATABASE remote:localhost/MarcoPoloToDrop #{user} #{pass};
   SET ignoreErrors false;
 
-  CREATE DATABASE remote:localhost/MarcoPoloTest root root plocal;
-  CREATE DATABASE remote:localhost/MarcoPoloToDrop root root memory;
+  CREATE DATABASE remote:localhost/MarcoPoloTest #{user} #{pass} plocal;
+  CREATE DATABASE remote:localhost/MarcoPoloToDrop #{user} #{pass} memory;
   """)
 
   output = run_script.("""
-  CONNECT remote:localhost/MarcoPoloTest admin admin;
-  CREATE CLUSTER schemaless;
-  CREATE CLASS Schemaless CLUSTER schemaless;
+  CONNECT remote:localhost/MarcoPoloTest #{user} #{pass};
+  CREATE CLUSTER schemaless ID 999;
+  CREATE CLASS Schemaless CLUSTER 999;
   """)
 
   clusters = [{"schemaless", extract_cluster_id.(output)}|clusters]
 
   output = run_script.("""
-  CONNECT remote:localhost/MarcoPoloTest admin admin;
-  CREATE CLUSTER schemaful;
+  CONNECT remote:localhost/MarcoPoloTest #{user} #{pass};
+  CREATE CLUSTER schemaful ID 1001;
   CREATE CLASS Schemaful;
   CREATE PROPERTY Schemaful.myString STRING;
   """)
@@ -116,8 +114,8 @@ unless :integration in ExUnit.configuration[:exclude] do
   ]
 
   defmodule TestHelpers do
-    def user,     do: System.get_env("ORIENTDB_USER")
-    def password, do: System.get_env("ORIENTDB_PASS")
+    def user,     do: unquote(user)
+    def password, do: unquote(pass)
 
     def cluster_id(name) do
       {_, id} = List.keyfind(unquote(Macro.escape(clusters)), name, 0)
