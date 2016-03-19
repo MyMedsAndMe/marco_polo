@@ -50,7 +50,8 @@ defmodule MarcoPolo.Mixfile do
      {:connection, "~> 1.0.0"},
      {:dialyze, "~> 0.2.0", only: :dev},
      {:coverex, "~> 1.4", only: :test},
-     {:ex_doc, "~> 0.9", only: :docs}]
+     {:earmark, ">= 0.0.0", only: :docs},
+     {:ex_doc, ">= 0.0.0", only: :docs}]
   end
 
   defp test_all(args) do
