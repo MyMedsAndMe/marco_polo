@@ -75,13 +75,12 @@ defmodule MarcoPolo.Connection.Auth do
 
   defp op_and_args_from_connection_type(:server),
     do: {:connect, []}
-  defp op_and_args_from_connection_type({:db, name, type})
-    when type in [:document, :graph],
+  defp op_and_args_from_connection_type({:db, name}),
     do: {:db_open, [name]}
-  defp op_and_args_from_connection_type({:db, _, type}),
-    do: raise(ArgumentError, "unknown database type: #{inspect type}, valid ones are :document, :graph")
+  defp op_and_args_from_connection_type({:db, _name, _type}),
+    do: raise(ArgumentError, "the database type is not supported (anymore) when connecting to a database, use {:db, db_name} instead")
   defp op_and_args_from_connection_type(_type),
-    do: raise(ArgumentError, "invalid connection type, valid ones are :server or {:db, name, type}")
+    do: raise(ArgumentError, "invalid connection type, valid ones are :server or {:db, name}")
 
   defp wait_for_connection_response(%{socket: socket, opts: opts} = s, connection_type) do
     case :gen_tcp.recv(socket, 0, opts[:timeout] || @timeout) do

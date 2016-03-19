@@ -19,7 +19,7 @@ Now run `mix deps.get` in your shell to fetch and compile MarcoPolo. To play wit
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "admin",
                                    password: "admin",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 {:ok, %{response: cluster_id}} = MarcoPolo.command(conn, "CREATE CLASS ProgrammingLanguage")
 cluster_id #=> 15
@@ -115,7 +115,7 @@ MarcoPolo supports OrientDB [fetch plans][odb-fetching-strategies]. Starting wit
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 {:ok, %{response: country}} = MarcoPolo.command(conn, "INSERT INTO Country(name) VALUES ('USA')")
 
@@ -144,7 +144,7 @@ function showed above:
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :graph})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 query = "CREATE VERTEX V SET name = 'Pizza place'"
 {:ok, %{response: pizza_place}} = MarcoPolo.command(conn, query)
@@ -174,7 +174,7 @@ this feature through the `MarcoPolo.script/4` function:
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 {:ok, _} = MarcoPolo.script(conn, "Javascript", """
 db.command('CREATE CLASS Number);
@@ -196,7 +196,7 @@ MarcoPolo:
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 {:ok, resp} = MarcoPolo.transaction(conn, [
   {:create, %MarcoPolo.Document{class: "Foo", fields: %{"foo" => "bar"}}},
@@ -217,7 +217,7 @@ can perform a transaction by using a SQL script:
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 script = """
 begin
@@ -249,7 +249,7 @@ All of this is pretty straightforward in MarcoPolo:
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "root",
                                    password: "root",
-                                   connection: {:db, "GratefulDeadConcerts", :document})
+                                   connection: {:db, "GratefulDeadConcerts"})
 
 # Let's keep the token around so that we can unsubscribe later
 {:ok, token} = MarcoPolo.live_query(conn, "LIVE SELECT FROM Person", self())

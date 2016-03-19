@@ -106,7 +106,7 @@ defmodule MarcoPolo.Connection do
 
   defp maybe_fetch_schema(pid, opts) do
     case Keyword.get(opts, :connection) do
-      {:db, _, _} -> fetch_schema(pid)
+      {:db, _} -> fetch_schema(pid)
       _           -> nil
     end
   end
@@ -351,7 +351,7 @@ defmodule MarcoPolo.Connection do
     tx_commit
   )a
 
-  defp do_check_op_is_allowed!({:db, _, _}, op) when not op in @db_ops do
+  defp do_check_op_is_allowed!({:db, _}, op) when not op in @db_ops do
     raise Error, "must be connected to the server (not a db) to perform operation #{op}"
   end
 

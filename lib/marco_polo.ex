@@ -24,7 +24,7 @@ defmodule MarcoPolo do
 
   ## Examples
 
-      conn_type = {:db, "GratefulDeadConcerts", :document}
+      conn_type = {:db, "GratefulDeadConcerts"}
       {:ok, conn} = MarcoPolo.start_link(user: "admin", password: "admin", connection: conn_type)
       MarcoPolo.command(conn, "SELECT FROM OUser")
       #=> {:ok, [...users...]}
@@ -77,8 +77,8 @@ defmodule MarcoPolo do
       for the `MarcoPolo` module (there's a "Connection type" section). It can
       be:
       * `:server` - connects to the server to perform server operations
-      * `{:db, db_name, db_type}` - connects to a database to perform database
-        operations. `db_type` can be either `:document` or `:graph`.
+      * `{:db, db_name}` - connects to a database to perform database
+        operations.
     * `:host` - (string or charlist) the host where the OrientDB server is
       running. Defaults to `"localhost"`.
     * `:port` - (integer) the port where the OrientDB server is running.
@@ -98,7 +98,7 @@ defmodule MarcoPolo do
 
   Connecting to a database:
 
-      iex> connection = {:db, "MyDatabase", :document}
+      iex> connection = {:db, "MyDatabase"}
       iex> {:ok, conn} = MarcoPolo.start_link user: "admin", password: "admin", connection: connection
       iex> is_pid(conn)
       true

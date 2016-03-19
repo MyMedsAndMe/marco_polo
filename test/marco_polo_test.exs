@@ -26,21 +26,22 @@ defmodule MarcoPoloTest do
 
     assert_receive {:EXIT, ^pid, {error, _}}
 
-    msg = "invalid connection type, valid ones are :server or {:db, name, type}"
+    msg = "invalid connection type, valid ones are :server or {:db, name}"
     assert Exception.message(error) == msg
 
     Logger.add_backend(:console, flush: true)
   end
 
-  test "start_link/1: raises if the database type is not :document or :graph" do
+  test "start_link/1: raises if db type is used when connecting" do
     Process.flag :trap_exit, true
     Logger.remove_backend(:console, flush: true)
 
-    {{error, _}, _} = catch_exit(
-      MarcoPolo.start_link(user: "foo", password: "foo", connection: {:db, "foo", "doc"})
-    )
+    {:ok, conn} = MarcoPolo.start_link(user: "foo", password: "foo", connection: {:db, "foo", :document})
 
-    msg = ~s(unknown database type: "doc", valid ones are :document, :graph)
+    assert_receive {:EXIT, ^conn, {error, _stacktrace}}
+
+    msg = "the database type is not supported (anymore) when connecting" <>
+          " to a database, use {:db, db_name} instead"
     assert Exception.message(error) == msg
 
     Logger.add_backend(:console, flush: true)
@@ -120,7 +121,7 @@ defmodule MarcoPoloTest do
 
     setup do
       {:ok, conn} = MarcoPolo.start_link(
-        connection: {:db, "MarcoPoloTest", :document},
+        connection: {:db, "MarcoPoloTest"},
         user: TestHelpers.user(),
         password: TestHelpers.password()
       )
