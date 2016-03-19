@@ -94,11 +94,15 @@ defmodule MarcoPoloMiscTest do
   end
 
   test "unknown property ids are handled automatically with load_record/3", %{conn: c} do
-    {:ok, %{response: cluster_id}} = command(c, "CREATE CLASS UnknownPropertyIdRecordLoad")
-    {:ok, _} = command(c, "CREATE PROPERTY UnknownPropertyIdRecordLoad.i SHORT")
+    # TODO: affected by the cluster_id changes in 2.2.0-beta.
 
-    doc = %Document{class: "UnknownPropertyIdRecordLoad", fields: %{"i" => 1}}
-    {:ok, {rid, _}} = create_record(c, cluster_id, doc)
+    {:ok, %{response: _cluster_id}} =
+      command(c, "CREATE CLASS UnknownPropertyIdRecordLoad")
+    {:ok, _} =
+      command(c, "CREATE PROPERTY UnknownPropertyIdRecordLoad.i SHORT")
+
+    {:ok, %{response: %Document{rid: rid}}} =
+      command(c, "INSERT INTO UnknownPropertyIdRecordLoad(i) VALUES (1)")
 
     assert {:ok, {loaded_doc, _}} = load_record(c, rid)
     assert loaded_doc.class == "UnknownPropertyIdRecordLoad"
@@ -187,7 +191,9 @@ defmodule MarcoPoloMiscTest do
   end
 
   test "transactions", %{conn: c} do
-    {:ok, %{response: cluster_id}} =
+    # TODO: affected by the cluster_id changes in 2.2.0-beta.
+
+    {:ok, %{response: _cluster_id}} =
       command(c, "CREATE CLASS TransactionsTest")
     {:ok, %{response: [_doc1, doc2, doc3]}} =
       command(c, "INSERT INTO TransactionsTest(f) VALUES (1), (2), (3)")
@@ -203,9 +209,8 @@ defmodule MarcoPoloMiscTest do
 
     assert {:ok, %{created: created, updated: updated}} = transaction(c, operations)
 
-    assert [{%RID{cluster_id: ^cluster_id}, _}, {%RID{cluster_id: ^cluster_id}, _}]
-           = created
-    assert [{%RID{cluster_id: ^cluster_id}, _}] = updated
+    assert [{%RID{}, _}, {%RID{}, _}] = created
+    assert [{%RID{}, _}] = updated
 
     # Let's check the created records have actually been created.
     assert {:ok, %{response: [_, _]}}
@@ -221,19 +226,19 @@ defmodule MarcoPoloMiscTest do
   end
 
   test "unknown property ids after the first record", %{conn: c} do
-    {:ok, %{response: cluster_id}} =
+    # TODO: affected by the cluster_id changes in 2.2.0-beta.
+
+    {:ok, %{response: _cluster_id}} =
       command(c, "CREATE CLASS UnknownPropertyIds")
 
-    {:ok, {rid1, _}} =
-      create_record(c, cluster_id, %Document{class: "UnknownPropertyIds", fields: %{"i" => 1}})
+    {:ok, %{response: %Document{rid: rid1}}} =
+      command(c, "INSERT INTO UnknownPropertyIds(i) VALUES (1)")
 
-    {:ok, _} =
+    {:ok, %{response: _property_id}} =
       command(c, "CREATE PROPERTY UnknownPropertyIds.str STRING")
 
-    {:ok, {rid2, _}} =
-      create_record(c,
-                    cluster_id,
-                    %Document{class: "UnknownPropertyIds", fields: %{"i" => 2, "str" => "value"}})
+    {:ok, %{response: %Document{rid: rid2}}} =
+      command(c, "INSERT INTO UnknownPropertyIds(i, str) VALUES (2, 'value')")
 
     assert {:ok, %{response: [doc1, doc2]}}
            = command(c, "SELECT FROM UnknownPropertyIds ORDER BY i ASC")
