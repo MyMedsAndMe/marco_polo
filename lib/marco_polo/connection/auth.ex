@@ -77,7 +77,7 @@ defmodule MarcoPolo.Connection.Auth do
     do: {:connect, []}
   defp op_and_args_from_connection_type({:db, name, type})
     when type in [:document, :graph],
-    do: {:db_open, [name, Atom.to_string(type)]}
+    do: {:db_open, [name]}
   defp op_and_args_from_connection_type({:db, _, type}),
     do: raise(ArgumentError, "unknown database type: #{inspect type}, valid ones are :document, :graph")
   defp op_and_args_from_connection_type(_type),
