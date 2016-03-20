@@ -4,6 +4,7 @@ env:
   global:
     - ORIENTDB_USER=root
     - ORIENTDB_PASS=root
+    - ORIENTDB_CACERTFILE="$(pwd)/ci/orientdb.pem"
   matrix:
     - ORIENTDB_VERSION="2.2.0-beta"
 
@@ -13,8 +14,17 @@ elixir:
 otp_release:
   - 18.2.1
 
+# We want to use Java 8 because of some error with missing crypto algorithms in
+# Java 7.
+addons:
+  apt:
+    packages:
+      - oracle-java8-installer
+
 before_install:
   - chmod +x ./ci/ci.sh
+  - wget https://raw.githubusercontent.com/michaelklishin/jdk_switcher/master/jdk_switcher.sh && . ./jdk_switcher.sh
+  - jdk_switcher use oraclejdk8
   - ./ci/ci.sh
   - export PATH="$(pwd)/tmp:$PATH"
 

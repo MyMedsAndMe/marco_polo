@@ -35,6 +35,7 @@ else
 fi
 
 cp -v "$CI_DIR/configs/orientdb-server-log.properties" ./config/
+cp -rv "$CI_DIR/configs/cert" ./config/
 
 
 echo "==> Creating an orientdb-console script"

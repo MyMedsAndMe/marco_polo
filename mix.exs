@@ -29,7 +29,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :connection],
+    [applications: [:logger, :connection, :ssh],
      env: [client_name: @client_name, version: @version]]
   end
 
@@ -62,6 +62,8 @@ defmodule MarcoPolo.Mixfile do
     if is_nil(vsn) or Version.compare(vsn, "2.1.0") in [:eq, :gt] do
       args = ~w(--include live_query) ++ args
     end
+
+    args = ~w(--include ssl) ++ args
 
     Mix.Task.run "test", args
   end

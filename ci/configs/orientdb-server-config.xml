@@ -84,6 +84,11 @@
                 <parameter name="network.binary.debug" value="true" />
               </parameters>
             </listener>
+            <listener protocol="binary" socket="ssl" port-range="2434-2440" ip-address="0.0.0.0">
+              <parameters>
+                <parameter name="network.binary.debug" value="true" />
+              </parameters>
+            </listener>
             <listener protocol="http" socket="default" port-range="2480-2490" ip-address="0.0.0.0">
                 <commands>
                     <command implementation="com.orientechnologies.orient.server.network.protocol.http.command.get.OServerCommandGetStaticContent" pattern="GET|www GET|studio/ GET| GET|*.htm GET|*.html GET|*.xml GET|*.jpeg GET|*.jpg GET|*.png GET|*.gif GET|*.js GET|*.css GET|*.swf GET|*.ico GET|*.txt GET|*.otf GET|*.pjs GET|*.svg GET|*.json GET|*.woff GET|*.ttf GET|*.svgz" stateful="false">
@@ -114,5 +119,8 @@
         <entry value="fine" name="log.file.level"/>
 
         <entry value="1000000" name="ridBag.embeddedToSbtreeBonsaiThreshold"/>
+
+        <!-- let's experiment -->
+        <entry value="PBKDF2WithHmacSHA1" name="security.userPasswordDefaultAlgorithm"/>
     </properties>
 </orient-server>

@@ -41,8 +41,11 @@ defmodule MarcoPolo do
 
   @default_opts [
     host: "localhost",
-    port: 2424,
+    ssl: false,
   ]
+
+  @default_tcp_port 2424
+  @default_ssl_port 2434
 
   @default_fetch_plan ""
 
@@ -82,7 +85,11 @@ defmodule MarcoPolo do
     * `:host` - (string or charlist) the host where the OrientDB server is
       running. Defaults to `"localhost"`.
     * `:port` - (integer) the port where the OrientDB server is running.
-      Defaults to `2424`.
+      Defaults to `2434` for SSL connections and `2424` for normal connections.
+    * `:socket_opts` - (list) options to use when opening the TCP/SSL socket.
+    * `:ssl` - (boolean) whether to use SSL to connect to the OrientDB
+      server. Defaults to `false`.
+    * `:ssl_opts` - (list) SSL options (see the `:ssl` module for reference).
 
   It also accepts all options that `GenServer.start_link/3` accepts (e.g.,
   `:name` for registering the new process or `:timeout` for providing a
@@ -106,7 +113,9 @@ defmodule MarcoPolo do
   """
   @spec start_link(Keyword.t) :: GenServer.on_start
   def start_link(opts \\ []) do
-    C.start_link(Keyword.merge(@default_opts, opts))
+    Keyword.merge(@default_opts, opts)
+    |> put_default_port()
+    |> C.start_link()
   end
 
   @doc """
@@ -954,4 +963,9 @@ defmodule MarcoPolo do
 
   defp record_type(%Document{}), do: {:raw, "d"}
   defp record_type(%BinaryRecord{}), do: {:raw, "b"}
+
+  defp put_default_port(opts) do
+    port = if opts[:ssl], do: @default_ssl_port, else: @default_tcp_port
+    Keyword.put(opts, :port, port)
+  end
 end

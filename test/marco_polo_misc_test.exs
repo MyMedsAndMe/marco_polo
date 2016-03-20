@@ -329,4 +329,19 @@ defmodule MarcoPoloMiscTest do
     {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('unsubscribed')")
     refute_receive {:orientdb_live_query, _, _}
   end
+
+  @tag :ssl
+  test "SSL connection" do
+    assert {:ok, conn} = MarcoPolo.start_link(
+      connection: :server,
+      user: TestHelpers.user(),
+      password: TestHelpers.password(),
+      ssl: true,
+      ssl_opts: [cacertfile: to_char_list(TestHelpers.cacertfile())]
+    )
+
+    assert MarcoPolo.db_exists?(conn, "MarcoPoloTest", :plocal) == {:ok, true}
+
+    MarcoPolo.stop(conn)
+  end
 end
