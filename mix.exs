@@ -63,6 +63,8 @@ defmodule MarcoPolo.Mixfile do
       args = ~w(--include live_query) ++ args
     end
 
+    args = ~w(--include ssl) ++ args
+
     Mix.Task.run "test", args
   end
 end
