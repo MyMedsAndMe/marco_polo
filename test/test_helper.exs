@@ -12,7 +12,7 @@ excluded_versions =
 
 # Ignore scripting tests by default as scripting must be enabled manually in the
 # OrientDB server configuration. Same goes for Live Query.
-excludes = excluded_versions ++ [:scripting, :live_query]
+excludes = excluded_versions ++ [:scripting, :live_query, :ssl]
 ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ excludes)
 
 ExUnit.start()
@@ -113,9 +113,21 @@ unless :integration in ExUnit.configuration[:exclude] do
     insert_record.("schemaless_record_load", "INSERT INTO Schemaful(myString) VALUES ('record_load');"),
   ]
 
+  cacertfile =
+    if :ssl in ExUnit.configuration[:include] do
+      System.get_env("ORIENTDB_CACERTFILE") ||
+        Mix.raise """
+        The $ORIENTDB_CACERTFILE variable is not set. It should point to the
+        PEM certificate for the OrientDB server.
+        """
+    else
+      nil
+    end
+
   defmodule TestHelpers do
-    def user,     do: unquote(user)
-    def password, do: unquote(pass)
+    def user,       do: unquote(user)
+    def password,   do: unquote(pass)
+    def cacertfile, do: unquote(cacertfile)
 
     def cluster_id(name) do
       {_, id} = List.keyfind(unquote(Macro.escape(clusters)), name, 0)
