@@ -299,9 +299,14 @@ defmodule MarcoPolo.Connection do
     update_in(s.queue, &:queue.in(what, &1))
   end
 
+  # We handle some cases of stuff in the queue differently as we have to do
+  # stuff to the state (e.g., storing the schema in the state).
+  defp dequeue_and_parse_resp(s, popped_from_queue, data)
+
   defp dequeue_and_parse_resp(s, {{:value, {:fetch_schema, from}}, new_queue}, data) do
     sid = s.session_id
 
+    # Fetching the schema is a REQUEST_RECORD_LOAD operation.
     case Protocol.parse_resp(:record_load, data, s.schema) do
       :incomplete ->
         %{s | tail: data}
@@ -310,23 +315,28 @@ defmodule MarcoPolo.Connection do
       {^sid, {:ok, {schema, _linked_records}}, rest} ->
         schema = parse_schema(schema)
         Connection.reply(from, schema)
-        %{s | schema: schema, tail: rest, queue: new_queue}
+        s = %{s | schema: schema, queue: new_queue}
+        dequeue_and_parse_resp(s, :queue.out(new_queue), rest)
     end
   end
 
   defp dequeue_and_parse_resp(s, {{:value, {:live_query, from, receiver}}, new_queue}, data) do
     sid = s.session_id
 
+    # A live query is just a command (e.g., "LIVE SELECT ..."), so we parse it
+    # as such.
     case Protocol.parse_resp(:command, data, s.schema) do
+      :incomplete ->
+        %{s | tail: data}
       {^sid, {:ok, resp}, rest} ->
         token = LiveQuery.extract_token(resp)
         Connection.reply(from, {:ok, token})
-        s
-        |> Map.put(:tail, rest)
-        |> Map.put(:queue, new_queue)
-        |> put_in([:live_query_tokens, token], receiver)
-      _ ->
-        dequeue_and_parse_resp(s, {{:value, {from, :command}}, new_queue}, data)
+        s =
+          s
+          |> Map.put(:tail, rest)
+          |> Map.put(:queue, new_queue)
+          |> put_in([:live_query_tokens, token], receiver)
+        dequeue_and_parse_resp(s, :queue.out(new_queue), rest)
     end
   end
 
@@ -338,8 +348,13 @@ defmodule MarcoPolo.Connection do
         %{s | tail: data}
       {^sid, resp, rest} ->
         Connection.reply(from, resp)
-        %{s | tail: rest, queue: new_queue}
+        s = %{s | queue: new_queue}
+        dequeue_and_parse_resp(s, :queue.out(new_queue), rest)
     end
+  end
+
+  defp dequeue_and_parse_resp(s, {:empty, queue}, "") do
+    %{s | queue: queue}
   end
 
   defp check_op_is_allowed!(%{opts: opts}, operation) do
