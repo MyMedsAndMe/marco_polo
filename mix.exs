@@ -29,7 +29,7 @@ defmodule MarcoPolo.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :connection, :ssh],
+    [applications: [:logger, :connection, :ssl],
      env: [client_name: @client_name, version: @version]]
   end
 
