@@ -24,6 +24,9 @@ defmodule MarcoPolo.Connection.LiveQuery do
     case Protocol.parse_push_data(data, s.schema) do
       :incomplete ->
         %{s | tail: data}
+      {:ok, {token, :unsubscribed}, rest} ->
+        send_live_query_data_resp(s, token, :unsubscribed)
+        update_in(s.live_query_tokens, &Dict.delete(&1, token))
       {:ok, {token, resp}, rest} ->
         send_live_query_data_resp(s, token, resp)
         %{s | tail: rest}

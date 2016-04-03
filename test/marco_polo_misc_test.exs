@@ -325,6 +325,7 @@ defmodule MarcoPoloMiscTest do
     assert doc.fields["text"] == "updated"
 
     assert :ok = live_query_unsubscribe(c, token)
+    assert_receive {:orientdb_live_query, ^token, :unsubscribed}
 
     {:ok, _} = command(c, "INSERT INTO LiveQuerying(text) VALUES ('unsubscribed')")
     refute_receive {:orientdb_live_query, _, _}

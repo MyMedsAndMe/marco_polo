@@ -722,21 +722,24 @@ defmodule MarcoPolo do
   sent to `receiver`.
 
   If the subscription is successful, this function returns `{:ok, token}` where
-  `token` is a unique identifier for the subscription to the give live
+  `token` is a unique identifier for the subscription to the given live
   query. It's important to keep it around as it's needed to unsubscribe from the
   live query (see `live_query_unsubscribe/2`).
 
   The messages sent to `receiver` each time there's a change in the live query
-  has the following structure:
+  have the following structure:
 
+      {:orientdb_live_query, token, message}
       {:orientdb_live_query, token, {operation, record}}
 
   where:
 
     * `token` is the token mentioned above
-    * `operation` is one of `:create`, `:update`, or `:delete`, based on the
-      operation happened on the server
-    * `record` is the subject of the operation happened on the server
+    * `message` can be:
+      * `:unsubscribed` if `live_query_unsubscribe` was successful
+      * `{operation, record}`, where `operation` is one of `:create`, `:update`,
+        or `:delete`, based on the operation happened on the server, and
+        `record` is the subject of the operation happened on the server
 
   ## Options
 
@@ -791,7 +794,9 @@ defmodule MarcoPolo do
   messages will be sent to the receiver specified when the live query had been
   started.
 
-  This operation happens asynchronously, hence it always returns `:ok`.
+  This operation happens asynchronously: when the unsubscription happens, the
+  receiver will receive a `{:orientdb_live_query, token, :unsubscribed}`
+  message.
 
   ## Examples
 
@@ -805,7 +810,7 @@ defmodule MarcoPolo do
 
     case command(conn, "LIVE UNSUBSCRIBE #{string_token}") do
       {:ok, %{response: %Document{fields: %{"unsubscribed" => ^string_token}}}} ->
-        C.live_query_unsubscribe(conn, token)
+        :ok
       o ->
         o
     end
