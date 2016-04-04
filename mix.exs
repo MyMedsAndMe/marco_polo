@@ -49,7 +49,6 @@ defmodule MarcoPolo.Mixfile do
     [{:decimal, "~> 1.1.0"},
      {:connection, "~> 1.0.0"},
      {:dialyze, "~> 0.2.0", only: :dev},
-     {:coverex, "~> 1.4", only: :test},
      {:earmark, ">= 0.0.0", only: :docs},
      {:ex_doc, ">= 0.0.0", only: :docs}]
   end
