@@ -3,6 +3,7 @@
 ## v0.3.0-dev
 
 * [**BREAKING CHANGE**] Drop support for OrientDB < 2.2.0.
+* Add support for SSL (`ssl: true` as an option to `MarcoPolo.start_link/1`)
 
 ## v0.2.1
 
