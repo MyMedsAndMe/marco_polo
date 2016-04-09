@@ -435,22 +435,36 @@ defmodule MarcoPolo.Protocol do
     end
   end
 
+  # `data` is the original data without the @push_data byte at the beginning.
   defp do_parse_push_data(data, schema) do
     parsers = [
       dec_fn(:int), # in Java this is Integer.MIN_VALUE, wat
-      dec_fn(:byte), # the byte for REQUEST_PUSH_LIVE_QUERY
+      dec_fn(:byte), # the byte for the push request type
       dec_fn(:bytes), # the list of changes
     ]
+
+    push_live_query_code     = req_code(:push_live_query)
+    push_distrib_config_code = req_code(:push_distrib_config)
 
     case GP.parse(data, parsers) do
       :incomplete ->
         :incomplete
-      {[_int_min_value, 81, content], rest} ->
-        {:ok, parse_live_query_content(content, schema), rest}
+      {[_int_min_value, ^push_live_query_code, content], rest} ->
+        {:ok, parse_push_live_query_content(content, schema), rest}
+      {[_int_min_value, ^push_distrib_config_code, content], rest} ->
+        {:ok, parse_push_distrib_config_content(content, schema), rest}
     end
   end
 
-  defp parse_live_query_content(<<op_type, token :: int, record_type, version :: int, cluster_id :: short, position :: long, rest :: binary>>, schema) do
+  defp parse_push_live_query_content(<<?r,
+                                       op_type,
+                                       token :: int,
+                                       record_type,
+                                       version :: int,
+                                       cluster_id :: short,
+                                       position :: long,
+                                       rest :: binary>>,
+                                     schema) do
     {record_content, <<>>} = decode(rest, :bytes)
 
     rid = %RID{cluster_id: cluster_id, position: position}
@@ -469,6 +483,14 @@ defmodule MarcoPolo.Protocol do
     resp = {op, record}
 
     {token, resp}
+  end
+
+  defp parse_push_live_query_content(<<?u, token :: int>>, _schema) do
+    {token, :unsubscribed}
+  end
+
+  defp parse_push_distrib_config_content(content, _schema) do
+    raise "REQUEST_PUSH_DISTRIB_CONFIG is not implemented yet, bytes: #{inspect content}"
   end
 
   defp decode_record_by_type(@document, content, schema) do
@@ -512,6 +534,7 @@ defmodule MarcoPolo.Protocol do
   defp req_code(:db_reload),                         do: 73
   defp req_code(:push_record),                       do: 79
   defp req_code(:push_distrib_config),               do: 80
+  defp req_code(:push_live_query),                   do: 81
   defp req_code(:replication),                       do: 91
   defp req_code(:db_transfer),                       do: 93
   defp req_code(:db_freeze),                         do: 94
