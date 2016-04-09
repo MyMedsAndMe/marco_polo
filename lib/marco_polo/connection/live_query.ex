@@ -26,7 +26,8 @@ defmodule MarcoPolo.Connection.LiveQuery do
         %{s | tail: data}
       {:ok, {token, :unsubscribed}, rest} ->
         send_live_query_data_resp(s, token, :unsubscribed)
-        update_in(s.live_query_tokens, &Dict.delete(&1, token))
+        s = update_in(s.live_query_tokens, &Dict.delete(&1, token))
+        %{s | tail: rest}
       {:ok, {token, resp}, rest} ->
         send_live_query_data_resp(s, token, resp)
         %{s | tail: rest}
