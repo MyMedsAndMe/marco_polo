@@ -2,7 +2,7 @@ defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
   @client_name "MarcoPolo (Elixir driver)"
-  @version "0.2.1"
+  @version "0.2.2"
 
   def project do
     [app: :marco_polo,
