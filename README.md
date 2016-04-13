@@ -16,10 +16,12 @@ end
 
 Now run `mix deps.get` in your shell to fetch and compile MarcoPolo. To play with MarcoPolo, run `iex -S mix` in your project:
 
+You should give a connection type for a record `connection`.
+
 ```elixir
 {:ok, conn} = MarcoPolo.start_link(user: "admin",
                                    password: "admin",
-                                   connection: {:db, "GratefulDeadConcerts"})
+                                   connection: {:db, "GratefulDeadConcerts", "graph"})
 
 {:ok, %{response: cluster_id}} = MarcoPolo.command(conn, "CREATE CLASS ProgrammingLanguage")
 cluster_id #=> 15
