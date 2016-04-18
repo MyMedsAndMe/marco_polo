@@ -54,7 +54,8 @@ defmodule MarcoPolo.Connection.Auth do
     end
   end
 
-  defp op_and_connection_args(%{opts: opts, protocol_version: protocol}) do
+  defp op_and_connection_args(%{opts: opts}) do
+    protocol = Application.get_env(:marco_polo, :binary_protocol_version)
     {op, other_args} = op_and_args_from_connection_type(Keyword.fetch!(opts, :connection))
 
     static_args = [
@@ -70,15 +71,7 @@ defmodule MarcoPolo.Connection.Auth do
     user = Keyword.fetch!(opts, :user)
     password = Keyword.fetch!(opts, :password)
 
-    if function_exported?(Mix, :env, 0) and apply(Mix, :env, []) != :test do
-      IO.puts :stderr, """
-      MarcoPolo is sending two booleans (false, false) when connecting (either to
-      the server or to a DB) because that's what OrientDB apparently wants (by
-      looking at the server logs). These booleans are, guess what, not documented
-      so we're really shooting blindly here. :(
-      """
-    end
-    {op, static_args ++ [false, false] ++ other_args ++ [user, password]}
+    {op, static_args ++ other_args ++ [user, password]}
   end
 
   defp op_and_args_from_connection_type(:server),

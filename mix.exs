@@ -2,6 +2,7 @@ defmodule MarcoPolo.Mixfile do
   use Mix.Project
 
   @client_name "MarcoPolo (Elixir driver)"
+  @binary_protocol_version 33
   @version "0.2.1"
 
   def project do
@@ -30,7 +31,9 @@ defmodule MarcoPolo.Mixfile do
 
   def application do
     [applications: [:logger, :connection, :ssl],
-     env: [client_name: @client_name, version: @version]]
+     env: [client_name: @client_name,
+           version: @version,
+           binary_protocol_version: @binary_protocol_version]]
   end
 
   defp package do
