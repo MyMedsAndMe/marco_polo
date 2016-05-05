@@ -1,18 +1,6 @@
-supported_versions = ~w(2.2.0-beta)
-
-excluded_versions =
-  case System.get_env("ORIENTDB_VERSION") do
-    version when is_binary(version) ->
-      supported_versions
-      |> Enum.filter(fn(v) -> Version.compare(v, version) == :gt end)
-      |> Enum.map(&{:min_orientdb_version, &1})
-    _ ->
-      []
-  end
-
 # Ignore scripting tests by default as scripting must be enabled manually in the
 # OrientDB server configuration. Same goes for Live Query.
-excludes = excluded_versions ++ [:scripting, :live_query, :ssl]
+excludes = [:scripting, :live_query, :ssl]
 ExUnit.configure(exclude: (ExUnit.configuration[:exclude] || []) ++ excludes)
 
 ExUnit.start()

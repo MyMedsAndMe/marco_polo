@@ -8,6 +8,7 @@ defmodule MarcoPoloTest do
   alias MarcoPolo.RID
   alias MarcoPolo.Document
   alias MarcoPolo.BinaryRecord
+  alias MarcoPolo.FetchPlan
 
   setup context do
     auth_opts = [user: TestHelpers.user(), password: TestHelpers.password()]
@@ -15,98 +16,89 @@ defmodule MarcoPoloTest do
       context[:no_started_connection] ->
         {:ok, %{}}
       context[:connected_to_server] ->
-        {:ok, conn} = MarcoPolo.start_link(auth_opts ++ [connection: :server])
-        on_exit fn -> MarcoPolo.stop(conn) end
+        {:ok, conn} = start_link(auth_opts ++ [connection: :server])
+        on_exit fn -> stop_conn_blocking(conn) end
         {:ok, %{conn: conn}}
       true ->
         # In this case, we'll just connect to a database.
-        {:ok, conn} = MarcoPolo.start_link(auth_opts ++ [connection: {:db, "MarcoPoloTest"}])
-        on_exit fn -> MarcoPolo.stop(conn) end
+        {:ok, conn} = start_link(auth_opts ++ [connection: {:db, "MarcoPoloTest"}])
+        on_exit fn -> stop_conn_blocking(conn) end
         {:ok, %{conn: conn}}
     end
   end
 
   @tag :no_started_connection
   test "start_link/1: raises if no connection type is specified" do
-    Logger.remove_backend(:console, flush: true)
-    Process.flag :trap_exit, true
+    silence_log fn ->
+      Process.flag(:trap_exit, true)
+      {:ok, conn} = start_link(user: "foo", password: "foo")
 
-    {:ok, pid} = MarcoPolo.start_link user: "foo", password: "foo"
+      assert_receive {:EXIT, ^conn, {error, _}}
+      assert Exception.message(error) =~ "key :connection not found"
 
-    assert_receive {:EXIT, ^pid, {error, _}}
-    assert Exception.message(error) =~ "key :connection not found"
-
-    Logger.add_backend(:console, flush: true)
+      stop_conn_blocking(conn)
+    end
   end
 
   @tag :no_started_connection
   test "start_link/1: raises if the connection type is unknown" do
-    Process.flag :trap_exit, true
-    Logger.remove_backend(:console, flush: true)
-    {:ok, pid} = MarcoPolo.start_link(user: "foo", password: "foo", connection: :foo)
+    silence_log fn ->
+      Process.flag(:trap_exit, true)
+      {:ok, conn} = start_link(user: "foo", password: "foo", connection: :foo)
 
-    assert_receive {:EXIT, ^pid, {error, _}}
+      assert_receive {:EXIT, ^conn, {error, _}}
+      msg = "invalid connection type, valid ones are :server or {:db, name}"
+      assert Exception.message(error) == msg
 
-    msg = "invalid connection type, valid ones are :server or {:db, name}"
-    assert Exception.message(error) == msg
-
-    Logger.add_backend(:console, flush: true)
+      stop_conn_blocking(conn)
+    end
   end
 
   @tag :no_started_connection
   test "start_link/1: raises if db type is used when connecting" do
-    Process.flag :trap_exit, true
-    Logger.remove_backend(:console, flush: true)
+    silence_log fn ->
+      Process.flag :trap_exit, true
 
-    {:ok, conn} = MarcoPolo.start_link(user: "foo", password: "foo", connection: {:db, "foo", :document})
+      {:ok, conn} =
+        start_link(user: "foo", password: "foo", connection: {:db, "foo", :document})
 
-    assert_receive {:EXIT, ^conn, {error, _stacktrace}}
+      assert_receive {:EXIT, ^conn, {error, _stacktrace}}
+      msg =
+        "the database type is not supported (anymore) when connecting" <>
+        " to a database, use {:db, db_name} instead"
+      assert Exception.message(error) == msg
 
-    msg = "the database type is not supported (anymore) when connecting" <>
-          " to a database, use {:db, db_name} instead"
-    assert Exception.message(error) == msg
-
-    Logger.add_backend(:console, flush: true)
+      stop_conn_blocking(conn)
+    end
   end
 
   @tag :no_started_connection
   test "stop/1" do
-    {:ok, pid} = MarcoPolo.start_link(
+    {:ok, conn} = start_link(
       user: TestHelpers.user,
       password: TestHelpers.password,
       connection: :server
     )
 
-    assert Process.alive?(pid)
-
-    MarcoPolo.stop(pid)
-
-    assert_pid_will_die(pid)
-  end
-
-  defp assert_pid_will_die(pid) do
-    if Process.alive?(pid) do
-      :timer.sleep 20
-      assert_pid_will_die(pid)
-    else
-      refute Process.alive?(pid)
-    end
+    assert Process.alive?(conn)
+    stop(conn)
+    assert_pid_will_die(conn)
   end
 
   @tag :connected_to_server
   test "db_exists?/3", %{conn: c}  do
-    assert {:ok, true}  = MarcoPolo.db_exists?(c, "MarcoPoloTest", :plocal)
-    assert {:ok, false} = MarcoPolo.db_exists?(c, "nonexistent", :plocal)
+    assert {:ok, true}  = db_exists?(c, "MarcoPoloTest", :plocal)
+    assert {:ok, false} = db_exists?(c, "nonexistent", :plocal)
   end
 
   @tag :connected_to_server
   test "create_db/4 with a database that doens't exist yet", %{conn: c} do
-    assert :ok = MarcoPolo.create_db(c, "MarcoPoloTestGenerated", :document, :plocal)
+    assert :ok = create_db(c, "MarcoPoloTestGenerated", :document, :plocal)
   end
 
   @tag :connected_to_server
   test "create_db/4 with a database that already exists", %{conn: c} do
-    assert {:error, %Error{} = err} = MarcoPolo.create_db(c, "MarcoPoloTest", :document, :plocal)
+    assert {:error, %Error{} = err} = create_db(c, "MarcoPoloTest", :document, :plocal)
     assert [{exception, msg}] = err.errors
     assert exception == "com.orientechnologies.orient.core.exception.ODatabaseException"
     assert msg       =~ "Database named 'MarcoPoloTest' already exists:"
@@ -114,36 +106,38 @@ defmodule MarcoPoloTest do
 
   @tag :connected_to_server
   test "drop_db/3 with an existing database", %{conn: c} do
-    assert :ok = MarcoPolo.drop_db(c, "MarcoPoloToDrop", :memory)
+    assert :ok = drop_db(c, "MarcoPoloToDrop", :memory)
   end
 
   @tag :connected_to_server
   test "drop_db/3 with a non-existing database", %{conn: c} do
     expected_ex = "com.orientechnologies.orient.core.exception.OStorageException"
 
-    assert {:error, %MarcoPolo.Error{} = err} = MarcoPolo.drop_db(c, "Nonexistent", :plocal)
+    assert {:error, %Error{} = err} = drop_db(c, "Nonexistent", :plocal)
     assert [{^expected_ex, msg}] = err.errors
     assert msg =~ "Database with name 'Nonexistent' does not exist"
   end
 
   test "db_reload/1", %{conn: c} do
-    assert :ok = MarcoPolo.db_reload(c)
+    assert :ok = db_reload(c)
   end
 
   test "db_size/1", %{conn: c} do
-    assert {:ok, size} = MarcoPolo.db_size(c)
+    assert {:ok, size} = db_size(c)
     assert is_integer(size)
+    assert size >= 0
   end
 
   test "db_countrecords/1", %{conn: c} do
-    assert {:ok, nrecords} = MarcoPolo.db_countrecords(c)
+    assert {:ok, nrecords} = db_countrecords(c)
     assert is_integer(nrecords)
+    assert nrecords >= 0
   end
 
   test "load_record/4: loading a document", %{conn: c} do
     rid = TestHelpers.record_rid("record_load")
 
-    {:ok, {record, _}} = MarcoPolo.load_record(c, rid, fetch_plan: "*:-1")
+    {:ok, {record, _}} = load_record(c, rid, fetch_plan: "*:-1")
 
     assert %Document{} = record
     assert record.version == 1
@@ -152,16 +146,15 @@ defmodule MarcoPoloTest do
 
     rid = TestHelpers.record_rid("schemaless_record_load")
 
-    {:ok, {record, _}} = MarcoPolo.load_record(c, rid)
+    {:ok, {record, _}} = load_record(c, rid)
     assert record.version == 1
     assert record.class == "Schemaful"
     assert record.fields == %{"myString" => "record_load"}
   end
 
-  @tag min_orientdb_version: "2.1.0"
   test "load_record/4 using the :if_version_not_latest option", %{conn: c} do
     rid = TestHelpers.record_rid("record_load")
-    assert {:ok, {nil, _}} = MarcoPolo.load_record(c, rid, version: 1, if_version_not_latest: true)
+    assert {:ok, {nil, _}} = load_record(c, rid, version: 1, if_version_not_latest: true)
   end
 
   test "delete_record/3", %{conn: c} do
@@ -169,19 +162,19 @@ defmodule MarcoPoloTest do
     rid = TestHelpers.record_rid("record_delete")
 
     # Wrong version causes no deletions.
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version + 100)
+    assert {:ok, false} = delete_record(c, rid, version + 100)
 
-    assert {:ok, true}  = MarcoPolo.delete_record(c, rid, version)
-    assert {:ok, false} = MarcoPolo.delete_record(c, rid, version)
+    assert {:ok, true}  = delete_record(c, rid, version)
+    assert {:ok, false} = delete_record(c, rid, version)
   end
 
   test "create_record/3: creating a record (document) synchronously", %{conn: c} do
     cluster_id = TestHelpers.cluster_id("schemaless")
     record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
 
-    {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
+    {:ok, {rid, version}} = create_record(c, cluster_id, record)
 
-    assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
+    assert %RID{cluster_id: ^cluster_id} = rid
     assert is_integer(version)
   end
 
@@ -189,9 +182,9 @@ defmodule MarcoPoloTest do
     cluster_id = TestHelpers.cluster_id("schemaless")
     record = %BinaryRecord{contents: <<84, 41>>}
 
-    {:ok, {rid, version}} = MarcoPolo.create_record(c, cluster_id, record)
+    {:ok, {rid, version}} = create_record(c, cluster_id, record)
 
-    assert %MarcoPolo.RID{cluster_id: ^cluster_id} = rid
+    assert %RID{cluster_id: ^cluster_id} = rid
     assert is_integer(version)
   end
 
@@ -199,14 +192,14 @@ defmodule MarcoPoloTest do
     cluster_id = TestHelpers.cluster_id("schemaless")
     record = %Document{class: "Schemaless", fields: %{"foo" => "bar"}}
 
-    :ok = MarcoPolo.create_record(c, cluster_id, record, no_response: true)
+    :ok = create_record(c, cluster_id, record, no_response: true)
   end
 
   test "update_record/6 synchronously", %{conn: c} do
     rid = TestHelpers.record_rid("record_update")
     new_doc = %Document{class: "Schemaless", fields: %{f: "bar"}}
 
-    assert {:ok, new_version} = MarcoPolo.update_record(c, rid, 1, new_doc, true)
+    assert {:ok, new_version} = update_record(c, rid, 1, new_doc, true)
     assert is_integer(new_version)
   end
 
@@ -214,11 +207,11 @@ defmodule MarcoPoloTest do
     rid = TestHelpers.record_rid("record_update")
     new_doc = %Document{class: "Schemaless", fields: %{f: "baz"}}
 
-    assert :ok = MarcoPolo.update_record(c, rid, 1, new_doc, true, no_response: true)
+    assert :ok = update_record(c, rid, 1, new_doc, true, no_response: true)
   end
 
   test "command/3: SELECT query without a WHERE clause", %{conn: c} do
-    {:ok, %{response: records}} = MarcoPolo.command(c, "SELECT FROM Schemaless", fetch_plan: "*:0")
+    {:ok, %{response: records}} = command(c, "SELECT FROM Schemaless", fetch_plan: "*:0")
 
     assert Enum.find(records, fn record ->
       assert %Document{} = record
@@ -229,7 +222,7 @@ defmodule MarcoPoloTest do
 
   test "command/3: SELECT query with a WHERE clause", %{conn: c} do
     cmd = "SELECT FROM Schemaless WHERE name = 'record_load' LIMIT 1"
-    res = MarcoPolo.command(c, cmd, fetch_plan: "*:-1")
+    res = command(c, cmd, fetch_plan: "*:-1")
 
     assert {:ok, %{response: [%Document{} = record]}} = res
     assert record.fields["name"] == "record_load"
@@ -238,7 +231,7 @@ defmodule MarcoPoloTest do
   test "command/3: SELECT query with named parameters", %{conn: c} do
     cmd    = "SELECT FROM Schemaless WHERE name = :name"
     params = %{"name" => "record_load"}
-    res    = MarcoPolo.command(c, cmd, fetch_plan: "*:-1", params: params)
+    res    = command(c, cmd, fetch_plan: "*:-1", params: params)
 
     assert {:ok, %{response: [%Document{} = record]}} = res
     assert record.fields["name"] == "record_load"
@@ -247,7 +240,7 @@ defmodule MarcoPoloTest do
   test "command/3: SELECT query with positional parameters", %{conn: c} do
     cmd = "SELECT FROM Schemaless WHERE name = ? AND f = ?"
     params = ["record_load", "foo"]
-    res = MarcoPolo.command(c, cmd, params: params)
+    res = command(c, cmd, params: params)
 
     assert {:ok, %{response: [%Document{} = doc]}} = res
     assert doc.fields["name"] == "record_load"
@@ -257,14 +250,12 @@ defmodule MarcoPoloTest do
   test "command/3: INSERT query inserting multiple records", %{conn: c} do
     cmd = "INSERT INTO Schemaless(my_field) VALUES ('value1'), ('value2')"
 
-    assert {:ok, %{response: [r1, r2]}} = MarcoPolo.command(c, cmd)
+    assert {:ok, %{response: [r1, r2]}} = command(c, cmd)
     assert r1.fields["my_field"] == "value1"
     assert r2.fields["my_field"] == "value2"
   end
 
   test "command/3: miscellaneous commands", %{conn: c} do
-    import MarcoPolo, only: [command: 2, command: 3]
-
     assert {:ok, %{}} = command(c, "CREATE CLUSTER misc_tests ID 1234")
     assert {:ok, %{}} = command(c, "CREATE CLASS MiscTests CLUSTER 1234")
     assert {:ok, %{}} = command(c, "CREATE PROPERTY MiscTests.foo DATETIME")
@@ -282,7 +273,7 @@ defmodule MarcoPoloTest do
       {:create, %BinaryRecord{contents: <<1, 2, 3>>}},
     ]
 
-    assert {:ok, %{created: created, updated: []}} = MarcoPolo.transaction(c, operations)
+    assert {:ok, %{created: created, updated: []}} = transaction(c, operations)
 
     assert [{%RID{cluster_id: ^cluster_id}, v1}, {%RID{}, v2}] = created
     assert is_integer(v1)
@@ -290,10 +281,10 @@ defmodule MarcoPoloTest do
   end
 
   test "transaction/3: updating/deleting a record with no :version raises", %{conn: c} do
-    doc = %MarcoPolo.Document{version: nil, rid: %MarcoPolo.RID{cluster_id: 1, position: 1}}
+    doc = %Document{version: nil, rid: %RID{cluster_id: 1, position: 1}}
 
-    assert_raise MarcoPolo.Error, fn ->
-      MarcoPolo.transaction(c, [{:delete, doc}])
+    assert_raise Error, fn ->
+      transaction(c, [{:delete, doc}])
     end
   end
 
@@ -307,9 +298,9 @@ defmodule MarcoPoloTest do
     }
     """
 
-    assert {:ok, _} = MarcoPolo.script(c, "Javascript", script)
+    assert {:ok, _} = script(c, "Javascript", script)
 
-    {:ok, %{response: records}} = MarcoPolo.command(c, "SELECT FROM ScriptTest", fetch_plan: "")
+    {:ok, %{response: records}} = command(c, "SELECT FROM ScriptTest", fetch_plan: "")
     records = Enum.map(records, fn(%Document{fields: %{"foo" => value}}) -> value end)
 
     assert records == ~w(test1 test2 test3)
@@ -367,7 +358,7 @@ defmodule MarcoPoloTest do
 
     assert :ok = create_record(c, cluster_id, doc, no_response: true)
 
-    {:ok, %{response: [loaded_doc]}} = command(c, query, fetch_plan: "*:-1")
+    assert {:ok, %{response: [loaded_doc]}} = command(c, query, fetch_plan: "*:-1")
 
     assert loaded_doc.class == "Schemaless"
     assert loaded_doc.fields == fields
@@ -439,11 +430,10 @@ defmodule MarcoPoloTest do
     Process.flag :trap_exit, true
     {:ok, c} = start_link(user: TestHelpers.user, password: TestHelpers.password, connection: :server)
 
-    msg = "must be connected to a database to perform operation db_reload"
-
-    Logger.remove_backend(:console, flush: true)
-    assert {{%Error{message: ^msg}, _}, _} = catch_exit(db_reload(c))
-    Logger.add_backend(:console, flush: true)
+    silence_log fn ->
+      msg = "must be connected to a database to perform operation db_reload"
+      assert {{%Error{message: ^msg}, _}, _} = catch_exit(db_reload(c))
+    end
   end
 
   # Tagged as >2.1 because 2.0 has a bunch of bugs with the SQL parser and
@@ -556,9 +546,9 @@ defmodule MarcoPoloTest do
       command(c, "SELECT FROM FetchingPlans WHERE name = 'child'", fetch_plan: "mother:0")
 
     assert resp.response == [child]
-    assert MarcoPolo.FetchPlan.resolve_links(child.fields["mother"], resp.linked_records)
+    assert FetchPlan.resolve_links(child.fields["mother"], resp.linked_records)
            == {:ok, mother}
-    assert MarcoPolo.FetchPlan.resolve_links(child.fields["father"], resp.linked_records)
+    assert FetchPlan.resolve_links(child.fields["father"], resp.linked_records)
            == :error
   end
 
@@ -626,9 +616,10 @@ defmodule MarcoPoloTest do
     refute_receive {:orientdb_live_query, _, _}
   end
 
+  @tag :no_started_connection
   @tag :ssl
   test "SSL connection" do
-    assert {:ok, conn} = MarcoPolo.start_link(
+    assert {:ok, conn} = start_link(
       connection: :server,
       user: TestHelpers.user(),
       password: TestHelpers.password(),
@@ -636,8 +627,30 @@ defmodule MarcoPoloTest do
       ssl_opts: [cacertfile: to_char_list(TestHelpers.cacertfile())]
     )
 
-    assert MarcoPolo.db_exists?(conn, "MarcoPoloTest", :plocal) == {:ok, true}
+    assert db_exists?(conn, "MarcoPoloTest", :plocal) == {:ok, true}
 
-    MarcoPolo.stop(conn)
+    stop(conn)
+  end
+
+  defp assert_pid_will_die(pid) do
+    if Process.alive?(pid) do
+      :timer.sleep(20)
+      assert_pid_will_die(pid)
+    else
+      refute Process.alive?(pid)
+    end
+  end
+
+  defp stop_conn_blocking(conn) do
+    :ok = stop(conn)
+    assert_pid_will_die(conn)
+  end
+
+  # TODO: replace with ExUnit.CaptureIO once we can depend on ~> 1.1
+  defp silence_log(fun) do
+    Logger.remove_backend :console
+    fun.()
+  after
+    Logger.add_backend :console, flush: true
   end
 end
