@@ -7,8 +7,8 @@ defmodule MarcoPolo.RESTTest do
   alias MarcoPolo.REST
 
   @opts [
-    user: "root",
-    password: "root",
+    user: TestHelpers.user(),
+    password: TestHelpers.password(),
   ]
 
   test "importing a valid JSON into an existing db" do
