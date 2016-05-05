@@ -30,8 +30,8 @@ defmodule MarcoPolo.Protocol do
     [req_code(op_name), encode_list(args)]
   end
 
-  def live_query_data?(@push_data <> _), do: true
-  def live_query_data?(_), do: false
+  def push_data?(@push_data <> _), do: true
+  def push_data?(_), do: false
 
   @doc """
   Parses the response to a given operation.
@@ -86,8 +86,16 @@ defmodule MarcoPolo.Protocol do
     parse_resp(connection_op, data, %{})
   end
 
-  def parse_push_data(@push_data <> rest, schema) do
-    do_parse_push_data(rest, schema)
+  def handle_push_data(@push_data <> data, s) do
+    case do_parse_push_data(data, s.schema) do
+      :incomplete ->
+        %{s | tail: data}
+      {:ok, :push_live_query, resp, rest} ->
+        s = LiveQuery.forward_live_query_data(resp, s)
+        %{s | tail: rest}
+      {:ok, :push_distrib_config, config, rest} ->
+        %{s | distrib_config: config, tail: rest}
+    end
   end
 
   defp parse_header(@ok <> <<sid :: int, rest :: binary>>),
@@ -450,9 +458,9 @@ defmodule MarcoPolo.Protocol do
       :incomplete ->
         :incomplete
       {[_int_min_value, ^push_live_query_code, content], rest} ->
-        {:ok, parse_push_live_query_content(content, schema), rest}
+        {:ok, :push_live_query, parse_push_live_query_content(content, schema), rest}
       {[_int_min_value, ^push_distrib_config_code, content], rest} ->
-        {:ok, parse_push_distrib_config_content(content, schema), rest}
+        {:ok, :push_distrib_config, parse_push_distrib_config_content(content, schema), rest}
     end
   end
 
@@ -489,8 +497,8 @@ defmodule MarcoPolo.Protocol do
     {token, :unsubscribed}
   end
 
-  defp parse_push_distrib_config_content(content, _schema) do
-    raise "REQUEST_PUSH_DISTRIB_CONFIG is not implemented yet, bytes: #{inspect content}"
+  defp parse_push_distrib_config_content(content, schema) do
+    RecordSerialization.decode(content, schema)
   end
 
   defp decode_record_by_type(@document, content, schema) do

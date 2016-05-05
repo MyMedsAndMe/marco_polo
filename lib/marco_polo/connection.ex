@@ -39,6 +39,8 @@ defmodule MarcoPolo.Connection do
     protocol_version: nil,
     # Dict of live query tokens to receiver pids
     live_query_tokens: HashDict.new,
+    # What comes inside REQUEST_PUSH_DISTRIB_CONFIG push requests
+    distrib_config: nil,
   }
 
   ## Client code.
@@ -90,6 +92,10 @@ defmodule MarcoPolo.Connection do
 
   def live_query(pid, args, receiver, opts) do
     Connection.call(pid, {:live_query, args, receiver}, opts[:timeout] || @timeout)
+  end
+
+  def distrib_config(pid, opts) do
+    Connection.call(pid, :distrib_config, opts[:timeout] || @timeout)
   end
 
   @doc """
@@ -202,6 +208,10 @@ defmodule MarcoPolo.Connection do
     |> send_noreply(Protocol.encode_op(:command, [s.session_id|args]))
   end
 
+  def handle_call(:distrib_config, _from, s) do
+    {:reply, s.distrib_config, s}
+  end
+
   @doc false
   def handle_cast(op, s)
 
@@ -224,8 +234,8 @@ defmodule MarcoPolo.Connection do
     data = s.tail <> msg
 
     s =
-      if Protocol.live_query_data?(data) do
-        LiveQuery.forward_live_query_data(data, s)
+      if Protocol.push_data?(data) do
+        Protocol.handle_push_data(data, s)
       else
         dequeue_and_parse_resp(s, :queue.out(s.queue), data)
       end

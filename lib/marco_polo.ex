@@ -816,6 +816,27 @@ defmodule MarcoPolo do
     end
   end
 
+  @doc """
+  Fetches the distributed configuration of the OrientDB server.
+
+  The OrientDB server will push data to clients (including MarcoPolo) when the
+  distributed configuration of the server changes. This configuration (a
+  `MarcoPolo.Document`) is stored by MarcoPolo and can be retrieved through this
+  function.
+
+  ## Options
+
+  This function accepts the following options:
+
+    * `:timeout` - operation timeout in milliseconds. If this timeout expires,
+      an exit signal will be sent to the calling process.
+
+  """
+  @spec distrib_config(pid) :: Document.t
+  def distrib_config(conn, opts \\ []) do
+    C.distrib_config(conn)
+  end
+
   defp encode_query_with_type(:sql_query, query, opts) do
     args = [query,
             -1,
