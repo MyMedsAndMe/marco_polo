@@ -70,10 +70,12 @@ unless :integration in ExUnit.configuration[:exclude] do
   DROP DATABASE remote:localhost/MarcoPoloTest #{user} #{pass};
   DROP DATABASE remote:localhost/MarcoPoloTestGenerated #{user} #{pass};
   DROP DATABASE remote:localhost/MarcoPoloToDrop #{user} #{pass};
+  DROP DATABASE remote:localhost/MarcoPoloImportDest #{user} #{pass};
   SET ignoreErrors false;
 
   CREATE DATABASE remote:localhost/MarcoPoloTest #{user} #{pass} plocal;
   CREATE DATABASE remote:localhost/MarcoPoloToDrop #{user} #{pass} memory;
+  CREATE DATABASE remote:localhost/MarcoPoloImportDest #{user} #{pass} plocal;
   """)
 
   output = run_script.("""

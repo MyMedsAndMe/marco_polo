@@ -1,5 +1,5 @@
 defmodule MarcoPolo.RESTTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   @moduletag :integration
   @moduletag :rest_api
@@ -13,7 +13,7 @@ defmodule MarcoPolo.RESTTest do
 
   test "importing a valid JSON into an existing db" do
     db_path = fixture_path("exported_db.json")
-    assert :ok = REST.import("ImportDest", db_path, @opts)
+    assert :ok = REST.import("MarcoPoloImportDest", db_path, @opts)
   end
 
   test "importing a valid JSON into a non-existing db" do
@@ -24,13 +24,13 @@ defmodule MarcoPolo.RESTTest do
 
   test "importing an invalid JSON into an existing db" do
     db_path = fixture_path("invalid_json.json")
-    assert :ok = MarcoPolo.REST.import("ImportDest", db_path, @opts)
+    assert :ok = MarcoPolo.REST.import("MarcoPoloImportDest", db_path, @opts)
   end
 
   test "connecting to a non-running server" do
     db_path = fixture_path("invalid_json.json")
     opts = @opts ++ [host: "nonexistent"]
-    assert {:error, :nxdomain} = REST.import("ImportDest", db_path, opts)
+    assert {:error, :nxdomain} = REST.import("MarcoPoloImportDest", db_path, opts)
   end
 
   defp fixture_path(path) do
