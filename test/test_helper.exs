@@ -93,6 +93,14 @@ unless :integration in ExUnit.configuration[:exclude] do
 
   clusters = [{"schemaful", extract_cluster_id.(output)}|clusters]
 
+  output = run_script.("""
+  CONNECT remote:localhost/MarcoPoloTest #{user} #{pass};
+  CREATE CLUSTER schemaless_with_binary_records ID 1002;
+  CREATE CLASS SchemalessWithBinaryRecords CLUSTER 1002;
+  """)
+
+  clusters = [{"schemaless_with_binary_records", extract_cluster_id.(output)}|clusters]
+
   # Insert some records
   records = records ++ [
     insert_record.("record_delete", "INSERT INTO Schemaless(name) VALUES ('record_delete');"),

@@ -179,7 +179,7 @@ defmodule MarcoPoloTest do
   end
 
   test "create_record/3: creating a record (blob) synchronously", %{conn: c} do
-    cluster_id = TestHelpers.cluster_id("schemaless")
+    cluster_id = TestHelpers.cluster_id("schemaless_with_binary_records")
     record = %BinaryRecord{contents: <<84, 41>>}
 
     {:ok, {rid, version}} = create_record(c, cluster_id, record)
@@ -270,12 +270,12 @@ defmodule MarcoPoloTest do
 
     operations = [
       {:create, %Document{class: "Schemaless", fields: %{"name" => "inside_transaction"}}},
-      {:create, %BinaryRecord{contents: <<1, 2, 3>>}},
+      {:create, %Document{class: "Schemaless", fields: %{"name" => "other_inside_transaction"}}},
     ]
 
     assert {:ok, %{created: created, updated: []}} = transaction(c, operations)
 
-    assert [{%RID{cluster_id: ^cluster_id}, v1}, {%RID{}, v2}] = created
+    assert [{%RID{cluster_id: ^cluster_id}, v1}, {%RID{cluster_id: ^cluster_id}, v2}] = created
     assert is_integer(v1)
     assert is_integer(v2)
   end
@@ -418,7 +418,7 @@ defmodule MarcoPoloTest do
   end
 
   test "creating and loading a binary record (blob)", %{conn: c} do
-    cluster_id = TestHelpers.cluster_id("schemaless")
+    cluster_id = TestHelpers.cluster_id("schemaless_with_binary_records")
     blob = %BinaryRecord{contents: <<91, 23>>}
 
     assert {:ok, {%RID{} = rid, _}} = create_record(c, cluster_id, blob)
