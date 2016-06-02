@@ -6,6 +6,7 @@ env:
     - ORIENTDB_PASS=root
     - ORIENTDB_CACERTFILE="$(pwd)/ci/orientdb.pem"
   matrix:
+    - ORIENTDB_VERSION="2.2.1-SNAPSHOT"
     - ORIENTDB_VERSION="2.2.0"
 
 elixir:

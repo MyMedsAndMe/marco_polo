@@ -6,7 +6,12 @@ ROOT=$(dirname $(cd "$(dirname "$0")"; pwd))
 CI_DIR="$ROOT/ci"
 BUILD_DIR="$ROOT/tmp"
 
-ODB_DOWNLOAD_URL="http://orientdb.com/download.php?email=unknown@unknown.com&file=orientdb-community-${ORIENTDB_VERSION}.tar.gz&os=linux"
+
+if [[ "${ORIENTDB_VERSION}" == *"SNAPSHOT"* ]]; then
+    ODB_DOWNLOAD_URL="https://oss.sonatype.org/service/local/artifact/maven/content?r=snapshots&g=com.orientechnologies&a=orientdb-community&v=${ORIENTDB_VERSION}&e=tar.gz"
+else
+    ODB_DOWNLOAD_URL="http://central.maven.org/maven2/com/orientechnologies/orientdb-community/${ORIENTDB_VERSION}/orientdb-community-${ORIENTDB_VERSION}.tar.gz"
+fi
 echo $BUILD_DIR
 
 mkdir -v -p "$BUILD_DIR"
