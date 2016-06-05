@@ -559,9 +559,9 @@ defmodule MarcoPoloTest do
 
     script = """
     BEGIN
-    LET person = CREATE VERTEX V SET first_name = 'Luke'
-    LET city = SELECT FROM City WHERE name = 'London'
-    LET edge = CREATE EDGE E FROM $person TO $city SET name = 'lives'
+    LET $person = CREATE VERTEX V SET first_name = 'Luke'
+    LET $city = SELECT FROM City WHERE name = 'London'
+    LET $edge = CREATE EDGE E FROM $person TO $city SET name = 'lives'
     COMMIT RETRY 100
     RETURN $edge
     """
