@@ -834,7 +834,7 @@ defmodule MarcoPolo do
   """
   @spec distrib_config(pid) :: Document.t
   def distrib_config(conn, opts \\ []) do
-    C.distrib_config(conn)
+    C.distrib_config(conn, opts)
   end
 
   defp encode_query_with_type(:sql_query, query, opts) do
@@ -849,13 +849,14 @@ defmodule MarcoPolo do
   defp encode_query_with_type(:sql_command, query, opts) do
     args = [query]
 
-    if params = opts[:params] do
-      params = %Document{class: nil, fields: %{"parameters" => to_params(params)}}
-      # `true` means "use simple parameters".
-      args = args ++ [true, params]
-    else
-      args = args ++ [false]
-    end
+    args=
+      if params = opts[:params] do
+        params = %Document{class: nil, fields: %{"parameters" => to_params(params)}}
+        # `true` means "use simple parameters".
+        args ++ [true, params]
+      else
+        args ++ [false]
+      end
 
     args = args ++ [false]
 

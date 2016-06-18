@@ -402,14 +402,11 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     |> Stream.map(fn({name, value}) -> encode_field_for_header(name, 0, value) end)
     |> Stream.map(&IO.iodata_length/1)
     |> Enum.sum
-    |> +(1)
+    |> Kernel.+(1)
   end
 
   defp encode_embedded(%Document{class: class, fields: fields}, offset) do
-    if is_nil(class) do
-      class = ""
-    end
-
+    class = if is_nil(class), do: "", else: class
     encoded_class  = encode_value(class)
     encoded_fields = encode_fields(fields, offset + IO.iodata_length(encoded_class))
 
@@ -420,10 +417,12 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     type = infer_type(value)
     name = to_string(name)
 
-    if is_nil(value) do
-      ptr = 0
-      type = :boolean
-    end
+    {ptr, type} =
+      if is_nil(value) do
+        {0, :boolean}
+      else
+        {ptr, type}
+      end
 
     [encode_value(name), <<ptr :: 32-signed>>, type_to_int(type)]
   end
@@ -490,19 +489,22 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {keys, values, _} = Enum.reduce map, {[], [], offset}, fn({key, value}, {ks, vs, index}) ->
       encoded_value = <<>>
 
-      if is_nil(value) do
-        key = [type_to_int(:string),
-               encode_value(to_string(key)),
-               <<0 :: 32-signed>>,
-               0]
-      else
-        key = [type_to_int(:string),
-               encode_value(to_string(key)),
-               <<index :: 32-signed>>,
-               type_to_int(infer_type(value))]
-        encoded_value = encode_value(value, index)
-        index = index + IO.iodata_length(encoded_value)
-      end
+      {key, index, encoded_value} =
+        if is_nil(value) do
+          key = [type_to_int(:string),
+                 encode_value(to_string(key)),
+                 <<0 :: 32-signed>>,
+                 0]
+          {key, index, encoded_value}
+        else
+          key = [type_to_int(:string),
+                 encode_value(to_string(key)),
+                 <<index :: 32-signed>>,
+                 type_to_int(infer_type(value))]
+          encoded_value = encode_value(value, index)
+          index = index + IO.iodata_length(encoded_value)
+          {key, index, encoded_value}
+        end
 
       {[key|ks], [encoded_value|vs], index}
     end
@@ -510,7 +512,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     keys   = Enum.reverse(keys)
     values = Enum.reverse(values)
 
-    nkeys = map |> map_size |> encode_zigzag_varint
+    nkeys = map |> map_size() |> encode_zigzag_varint()
 
     [nkeys, keys, values]
   end
