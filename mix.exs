@@ -19,14 +19,14 @@ defmodule MarcoPolo.Mixfile do
      test_coverage: [tool: Coverex.Task],
 
      # Hex
-     package: package,
-     description: description,
+     package: package(),
+     description: description(),
 
      # Docs
      name: "MarcoPolo",
      source_url: "https://github.com/MyMedsAndMe/marco_polo",
 
-     deps: deps]
+     deps: deps()]
   end
 
   def application do
@@ -63,9 +63,12 @@ defmodule MarcoPolo.Mixfile do
     args = ~w(--include scripting) ++ args
 
     vsn = System.get_env("ORIENTDB_VERSION")
-    if is_nil(vsn) or Version.compare(vsn, "2.1.0") in [:eq, :gt] do
-      args = ~w(--include live_query) ++ args
-    end
+    args =
+      if is_nil(vsn) or Version.compare(vsn, "2.1.0") in [:eq, :gt] do
+        ~w(--include live_query) ++ args
+      else
+        args
+      end
 
     args = ~w(--include ssl) ++ args
 

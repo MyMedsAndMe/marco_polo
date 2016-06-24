@@ -13,6 +13,7 @@ defmodule MarcoPolo.Protocol do
   alias MarcoPolo.RID
   alias MarcoPolo.Protocol.RecordSerialization
   alias MarcoPolo.Protocol.CSVTypes
+  alias MarcoPolo.Connection.LiveQuery
 
   @ok        <<0>>
   @error     <<1>>

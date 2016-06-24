@@ -531,6 +531,16 @@ defmodule MarcoPoloTest do
     assert doc2.rid == rid2
   end
 
+  test "big queries and big responses", %{conn: c} do
+    nrecords = 10_000
+    {:ok, _} = command(c, "CREATE CLASS LotsOfRecords")
+
+    command = "INSERT INTO LotsOfRecords(i) VALUES " <> Enum.map_join(1..nrecords, ", ", &("(#{&1})"))
+    assert {:ok, %{response: response, linked_records: linked_records}} = command(c, command)
+    assert HashDict.size(linked_records) == 0
+    assert length(response) == nrecords
+  end
+
   test "fetch plans", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS FetchingPlans")
     {:ok, %{response: mother}} =

@@ -316,7 +316,7 @@ defmodule MarcoPolo.Connection do
       {^sid, {:ok, {schema, _linked_records}}, rest} ->
         schema = parse_schema(schema)
         Connection.reply(from, schema)
-        s = %{s | schema: schema, queue: new_queue}
+        s = %{s | schema: schema, queue: new_queue, tail: rest}
         dequeue_and_parse_resp(s, :queue.out(new_queue), rest)
     end
   end
@@ -349,7 +349,7 @@ defmodule MarcoPolo.Connection do
         %{s | tail: data}
       {^sid, resp, rest} ->
         Connection.reply(from, resp)
-        s = %{s | queue: new_queue}
+        s = %{s | queue: new_queue, tail: rest}
         dequeue_and_parse_resp(s, :queue.out(new_queue), rest)
     end
   end

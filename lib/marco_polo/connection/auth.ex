@@ -3,6 +3,7 @@ defmodule MarcoPolo.Connection.Auth do
 
   import MarcoPolo.Protocol.BinaryHelpers
   alias MarcoPolo.Protocol
+  alias MarcoPolo.Error
 
   @typep state :: Map.t
 
