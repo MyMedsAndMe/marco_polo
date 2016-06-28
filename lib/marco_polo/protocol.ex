@@ -357,7 +357,12 @@ defmodule MarcoPolo.Protocol do
   end
 
   defp parse_record_with_rid(<<-3 :: short, rest :: binary>>, _schema) do
-    GP.parse(rest, [dec_fn(:short), dec_fn(:long)])
+    case GP.parse(rest, [dec_fn(:short), dec_fn(:long)]) do
+      {[cluster_id, position], rest} ->
+        {%RID{cluster_id: cluster_id, position: position}, rest}
+      :incomplete ->
+        :incomplete
+    end
   end
 
   defp parse_record_with_rid(_, _schema) do
