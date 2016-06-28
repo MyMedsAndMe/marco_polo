@@ -536,7 +536,8 @@ defmodule MarcoPoloTest do
     {:ok, _} = command(c, "CREATE CLASS LotsOfRecords")
 
     command = "INSERT INTO LotsOfRecords(i) VALUES " <> Enum.map_join(1..nrecords, ", ", &("(#{&1})"))
-    assert {:ok, %{response: response, linked_records: linked_records}} = command(c, command)
+    assert {:ok, %{response: response, linked_records: linked_records}} =
+      command(c, command, timeout: 20_000)
     assert HashDict.size(linked_records) == 0
     assert length(response) == nrecords
   end
