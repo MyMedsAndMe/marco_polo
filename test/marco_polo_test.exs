@@ -562,6 +562,37 @@ defmodule MarcoPoloTest do
            == :error
   end
 
+  test "nested graphs", %{conn: c} do
+    {:ok, _} = command(c, "CREATE CLASS Jedi EXTENDS V")
+    {:ok, _} = command(c, "CREATE CLASS IsPadawanOf EXTENDS E")
+    {:ok, %{response: [dooku, qui_gon, obi_wan, anakin]}} = command(c, """
+    INSERT INTO Jedi(name)
+    VALUES ('Count Dooku'), ('Qui-Gon Jinn'), ('Obi-Wan Kenobi'), ('Anakin Skywalker')
+    """)
+    {:ok, %{response: [obi_wan_to_anakin]}} =
+      command(c, "CREATE EDGE IsPadawanOf FROM ? TO ?", params: [anakin.rid, obi_wan.rid])
+    {:ok, %{response: [qui_gon_to_obi_wan]}} =
+      command(c, "CREATE EDGE IsPadawanOf FROM ? TO ?", params: [obi_wan.rid, qui_gon.rid])
+    {:ok, %{response: [dooku_to_qui_gon]}} =
+      command(c, "CREATE EDGE IsPadawanOf FROM ? TO ?", params: [qui_gon.rid, dooku.rid])
+
+    {:ok, %{response: resp}} = command(c, "TRAVERSE * FROM ?", params: [dooku.rid])
+    assert [v1, e1to2, v2, e2to3, v3, e3to4, v4] = resp
+
+    assert v1.class == "Jedi"
+    assert v1.fields["name"] == "Count Dooku"
+    assert v2.class == "Jedi"
+    assert v2.fields["name"] == "Qui-Gon Jinn"
+    assert v3.class == "Jedi"
+    assert v3.fields["name"] == "Obi-Wan Kenobi"
+    assert v4.class == "Jedi"
+    assert v4.fields["name"] == "Anakin Skywalker"
+
+    assert e1to2 == dooku_to_qui_gon.rid
+    assert e2to3 == qui_gon_to_obi_wan.rid
+    assert e3to4 == obi_wan_to_anakin.rid
+  end
+
   @tag :scripting
   test "batch transaction in a script with the SQL langauge (committing)", %{conn: c} do
     {:ok, _} = command(c, "CREATE CLASS City EXTENDS V")
