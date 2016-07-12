@@ -570,11 +570,17 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp nullify_empty_string(str) when is_binary(str), do: str
 
   defp get_rest_from_list_of_fields([_|_] = fields) do
+    case get_serialized_data(fields) do
+      nil -> <<>>
+      {{_name, _value}, serialized_data} -> serialized_data
+    end
+  end
+
+  defp get_serialized_data(fields) do
     fields
     |> Enum.reverse()
     |> Enum.drop_while(fn {{_name, val}, _rest} -> is_nil(val) end)
     |> List.first()
-    |> elem(1)
   end
 
   defp fields_to_map(fields) do
