@@ -12,10 +12,10 @@ env:
     - ORIENTDB_VERSION="2.2.2"
 
 elixir:
-  - 1.2.4
+  - 1.2.6
 
 otp_release:
-  - 18.2.1
+  - 18.3
 
 # We want to use Java 8 because of some error with missing crypto algorithms in
 # Java 7.
