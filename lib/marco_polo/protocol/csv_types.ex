@@ -97,23 +97,14 @@ defmodule MarcoPolo.Protocol.CSVTypes do
   end
 
   defp decode_date(digits) do
-    secs_from_epoch = digits |> String.to_integer |> div(1000)
-    {{yy, mm, dd}, _} = unix_timestamp_to_datetime(secs_from_epoch)
-    %MarcoPolo.Date{year: yy, month: mm, day: dd}
+    milliseconds_from_epoch = String.to_integer(digits)
+    {:ok, datetime} = DateTime.from_unix(milliseconds_from_epoch, :milliseconds)
+    DateTime.to_date(datetime)
   end
 
   defp decode_datetime(digits) do
-    digits = String.to_integer(digits)
-    secs_from_epoch = div(digits, 1000)
-    msec = rem(digits, 1000)
-
-    {{yy, mm, dd}, {h, m, s}} = unix_timestamp_to_datetime(secs_from_epoch)
-    %MarcoPolo.DateTime{year: yy, month: mm, day: dd,
-                        hour: h, min: m, sec: s, msec: msec}
-  end
-
-  defp unix_timestamp_to_datetime(seconds) do
-    epoch = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
-    :calendar.gregorian_seconds_to_datetime(epoch + seconds)
+    milliseconds_from_epoch = String.to_integer(digits)
+    {:ok, datetime} = DateTime.from_unix(milliseconds_from_epoch, :milliseconds)
+    DateTime.to_naive(datetime)
   end
 end

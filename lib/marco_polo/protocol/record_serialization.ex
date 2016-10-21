@@ -231,21 +231,14 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     {days, rest} = decode_zigzag_varint(pointed_data)
     days = :calendar.date_to_gregorian_days(1970, 1, 1) + days
     {y, m, d} = :calendar.gregorian_days_to_date(days)
-    {%MarcoPolo.Date{year: y, month: m, day: d}, rest}
+    {:ok, date} = Date.new(y, m, d)
+    {date, rest}
   end
 
   defp decode_simple_type(pointed_data, :datetime) do
-    {msecs_from_epoch, rest} = decode_simple_type(pointed_data, :long)
-    secs_from_epoch = div(msecs_from_epoch, 1000)
-    msec = rem(msecs_from_epoch, 1000)
-    epoch = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
-
-    total_secs = epoch + secs_from_epoch
-    {{year, month, day}, {hour, min, sec}} = :calendar.gregorian_seconds_to_datetime(total_secs)
-
-    {%MarcoPolo.DateTime{year: year, month: month, day: day,
-                         hour: hour, min: min, sec: sec, msec: msec},
-     rest}
+    {milliseconds_from_epoch, rest} = decode_simple_type(pointed_data, :long)
+    {:ok, datetime} = DateTime.from_unix(milliseconds_from_epoch, :milliseconds)
+    {DateTime.to_naive(datetime), rest}
   end
 
   defp decode_simple_type(data, :decimal) do
@@ -460,11 +453,7 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   end
 
   defp encode_type(dt, :datetime, _offset) do
-    datetime = {{dt.year, dt.month, dt.day}, {dt.hour, dt.min, dt.sec}}
-    secs     = :calendar.datetime_to_gregorian_seconds(datetime)
-    epoch    = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
-
-    encode_type((secs - epoch) * 1000 + dt.msec, :long, 0)
+    encode_type(DateTime.to_unix(datetime_from_naive(dt), :milliseconds), :long, 0)
   end
 
   defp encode_type(record, :embedded, offset) do
@@ -592,8 +581,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
   defp infer_type(%HashSet{}),               do: :embedded_set
   defp infer_type(%Document{}),              do: :embedded
   defp infer_type(%RID{}),                   do: :link
-  defp infer_type(%MarcoPolo.Date{}),        do: :date
-  defp infer_type(%MarcoPolo.DateTime{}),    do: :datetime
+  defp infer_type(%Date{}),                  do: :date
+  defp infer_type(%DateTime{}),              do: :datetime
+  defp infer_type(%NaiveDateTime{}),         do: :datetime
   defp infer_type(%Decimal{}),               do: :decimal
   defp infer_type(val) when is_boolean(val), do: :boolean
   defp infer_type(val) when is_binary(val),  do: :string
@@ -636,5 +626,9 @@ defmodule MarcoPolo.Protocol.RecordSerialization do
     defp int_to_type(unquote(type_id)),             do: unquote(type_name)
     defp type_to_int(unquote(type_name)),           do: unquote(type_id)
     defp string_to_type(unquote(stringified_type)), do: unquote(type_name)
+  end
+
+  defp datetime_from_naive(dt) do
+    %DateTime{year: dt.year, month: dt.month, day: dt.day, hour: dt.hour, minute: dt.minute, second: dt.second, microsecond: dt.microsecond, utc_offset: 0, std_offset: 0, time_zone: "Etc/UTC", zone_abbr: "UTC"}
   end
 end

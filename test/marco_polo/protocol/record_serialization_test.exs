@@ -170,7 +170,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "decode_type/2: date" do
-    date = %MarcoPolo.Date{year: 1945, month: 9, day: 11}
+    date = ~D[1945-09-11]
     assert decode_type(<<219, 138, 1, "foo">>, :date) == {date, "foo"}
   end
 
@@ -312,7 +312,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "encode_value/1: date" do
-    date = %MarcoPolo.Date{year: 1945, month: 9, day: 11}
+    date = ~D[1945-09-11]
     assert bin(encode_value(date)) == <<219, 138, 1>>
   end
 
