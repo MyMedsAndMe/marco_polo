@@ -46,12 +46,11 @@ defmodule MarcoPolo.Protocol.CSVTypesTest do
   end
 
   test "decode/1: dates" do
-    assert decode("1436983328000a") == %MarcoPolo.Date{day: 15, month: 7, year: 2015}
+    assert decode("1436983328000a") == ~D[2015-07-15]
   end
 
   test "decode/1: datetimes" do
-    assert decode("1436983328032t") == %MarcoPolo.DateTime{day: 15, month: 7, year: 2015,
-                                                           hour: 18, min: 2, sec: 8, msec: 32}
+    assert decode("1436983328032t") == ~N[2015-07-15 18:02:08.032]
   end
 
   test "decode/1: RIDs" do

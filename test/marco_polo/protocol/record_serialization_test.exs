@@ -3,7 +3,6 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   alias MarcoPolo.RID
   alias MarcoPolo.Document
-  alias MarcoPolo.DateTime
   alias MarcoPolo.Protocol.RecordSerialization, as: Ser
   alias MarcoPolo.Protocol.RecordSerialization.State
 
@@ -177,8 +176,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
 
   test "decode_type/2: datetime" do
     data = encode_zigzag_varint(1435665809901) <> "foo"
-    datetime = %DateTime{year: 2015, month: 6, day: 30,
-                         hour: 12, min: 03, sec: 29, msec: 901}
+    datetime = ~N[2015-06-30 12:03:29.901]
     assert decode_type(data, :datetime) == {datetime, "foo"}
   end
 
@@ -319,8 +317,7 @@ defmodule MarcoPolo.Protocol.RecordSerializationTest do
   end
 
   test "encode_value/1: datetime" do
-    datetime = %DateTime{year: 2015, month: 6, day: 30,
-                         hour: 12, min: 03, sec: 29, msec: 901}
+    datetime = ~N[2015-06-30 12:03:29.901]
     assert bin(encode_value(datetime)) == encode_zigzag_varint(1435665809901)
   end
 
