@@ -8,7 +8,7 @@ defmodule MarcoPolo.Mixfile do
   def project do
     [app: :marco_polo,
      version: @version,
-     elixir: "~> 1.0",
+     elixir: ">= 1.3.2",
 
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
